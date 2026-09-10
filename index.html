@@ -190,9 +190,7 @@
             let famillesTrouvees = [];
 
             const ancienneDonnee = localStorage.getItem('arbre_famille');
-            if (ancienneDonnee) {
-                famillesTrouvees.push({ cle: 'arbre_famille', nom: 'Palussiere' });
-            }
+
 
             for (let i = 0; i < localStorage.length; i++) {
                 const cle = localStorage.key(i);
@@ -204,9 +202,7 @@
                 }
             }
 
-            if (famillesTrouvees.length === 0) {
-                famillesTrouvees.push({ cle: 'arbre_famille_palussiere', nom: 'Palussiere' });
-            }
+
 
             famillesTrouvees.forEach(fam => {
                 let nbMembres = 0;
