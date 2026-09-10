@@ -310,9 +310,6 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille');
-
-        const urlParams = new URLSearchParams(window.location.search);
         const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille') || "defaut";
         const storageKey = `arbre_famille_${nomFamilleParam.toLowerCase()}`;
 
