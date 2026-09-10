@@ -229,6 +229,7 @@
             <div class="actions-left">
                 <button class="btn-secondary" onclick="retourAccueil()">⬅️ Retour</button>
                 <button id="btn-toggle-vue" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
+				<button onclick="exporterJSON()">💾 Exporter en JSON</button>
             </div>
             <div class="actions-right"></div>
         </div>
@@ -309,6 +310,24 @@
     </div>
 
     <script>
+	// Fonction pour exporter les données de la famille active en JSON
+		function exporterJSON() {
+			const donnees = localStorage.getItem(storageKey);
+			if (!donnees) {
+				alert("Aucune donnée à exporter pour cette famille !");
+				return;
+			}
+
+			const blob = new Blob([donnees], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${storageKey}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
         const urlParams = new URLSearchParams(window.location.search);
         const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille') || "defaut";
         const storageKey = `arbre_famille_${nomFamilleParam.toLowerCase()}`;
