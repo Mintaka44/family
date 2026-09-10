@@ -32,15 +32,6 @@
             gap: 15px;
         }
 
-        .header-accueil h1 {
-            margin: 0;
-            font-size: 22px;
-            color: #1e293b;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         .header-actions {
             display: flex;
             gap: 10px;
@@ -126,7 +117,15 @@
         .famille-info p {
             color: #64748b;
             font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        /* Style pour la date de dernière modification */
+        .famille-date {
+            color: #94a3b8;
+            font-size: 11px;
             margin-bottom: 20px;
+            font-style: italic;
         }
 
         .card-actions {
@@ -174,11 +173,27 @@
 
     <div class="container">
         <!-- En-tête moderne regroupant le titre et les actions principales -->
-        <div class="header-accueil">
-            <h1>🌳 Gestion et Arbre Généalogique</h1>
-            <div class="header-actions">
+        <div class="header-accueil" style="flex-direction: column; align-items: stretch; padding: 20px;">
+            <svg viewBox="0 0 1200 200" width="100%" style="border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;">
+                <defs>
+                    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#1e293b" />
+                        <stop offset="100%" stop-color="#3b82f6" />
+                    </linearGradient>
+                </defs>
+                <rect width="1200" height="200" fill="url(#bg-grad)" rx="12" />
+                <circle cx="150" cy="100" r="80" fill="rgba(255,255,255,0.03)" />
+                <circle cx="1050" cy="80" r="120" fill="rgba(255,255,255,0.03)" />
+                <g transform="translate(560, 40)">
+                    <circle cx="40" cy="40" r="35" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                    <text x="40" y="48" font-size="28" text-anchor="middle">🌳</text>
+                </g>
+                <text x="600" y="135" font-family="'Segoe UI', Tahoma, sans-serif" font-size="26" font-weight="bold" fill="#ffffff" text-anchor="middle">Arbre Généalogique & Famille</text>
+                <text x="600" y="160" font-family="'Segoe UI', Tahoma, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">Gestion et suivi des arbres familiaux</text>
+            </svg>
+            
+            <div class="header-actions" style="justify-content: flex-end;">
                 <button onclick="ouvrirModalCreation()">➕ Créer une famille</button>
-                <!-- Input file masqué déclenché par le bouton Importer -->
                 <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importerJSON(event)">
                 <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Importer</button>
             </div>
@@ -207,7 +222,6 @@
     </div>
 
     <script>
-		// Fonction pour importer un fichier JSON et écraser/créer les données locales
 		function importerJSON(event) {
 			const file = event.target.files[0];
 			if (!file) return;
@@ -218,22 +232,16 @@
 					const contenu = e.target.result;
 					const dataFamille = JSON.parse(contenu);
 
-					// Vérification que le JSON contient bien un nom de famille
 					if (!dataFamille.nomFamille) {
 						alert("Erreur : Le fichier JSON ne contient pas de nom de famille valide.");
 						return;
 					}
 
-					// Génération dynamique de la clé de stockage correspondante
 					const nomFamille = dataFamille.nomFamille.toLowerCase();
 					const targetKey = `arbre_famille_${nomFamille}`;
 
-					// Sauvegarde dans le localStorage
 					localStorage.setItem(targetKey, contenu);
-					
 					alert(`Import réussi pour la famille "${dataFamille.nomFamille}" !`);
-					
-					// Redirection optionnelle vers la page de cette famille
 					window.location.href = `famille.html?nom=${encodeURIComponent(dataFamille.nomFamille)}`;
 				} catch (err) {
 					alert("Erreur : Le fichier sélectionné n'est pas un fichier JSON valide.");
@@ -261,6 +269,8 @@
 
             famillesTrouvees.forEach(fam => {
                 let nbMembres = 0;
+                let texteDate = "Modifié récemment";
+                
                 try {
                     const rawData = localStorage.getItem(fam.cle);
                     if (rawData) {
@@ -270,6 +280,12 @@
                         }
                         if (parsed && parsed.nomFamille) {
                             fam.nomAffichage = parsed.nomFamille;
+                        }
+                        // Récupération et formatage de la date de modification si elle existe
+                        if (parsed && parsed.derniereModification) {
+                            const dateObj = new Date(parsed.derniereModification);
+                            const options = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+                            texteDate = `Modifié le ${dateObj.toLocaleDateString('fr-FR', options)}`;
                         }
                     }
                 } catch(e) {
@@ -284,6 +300,7 @@
                     <div class="famille-info">
                         <h3>Famille ${nomAffichage}</h3>
                         <p>${nbMembres} membre${nbMembres > 1 ? 's' : ''} enregistré${nbMembres > 1 ? 's' : ''}</p>
+                        <div class="famille-date">${texteDate}</div>
                     </div>
                     <div class="card-actions">
                         <button onclick="ouvrirFamille('${nomAffichage}')">Ouvrir l'arbre</button>
