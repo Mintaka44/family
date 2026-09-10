@@ -617,7 +617,14 @@
 
             const g = svgGroup.append("g");
 
-            const treeLayout = d3.tree().size([width - 300, height - 200]);
+            const treeLayout = d3.tree()
+								.size([width - 100, height - 200])
+								.separation((a, b) => {
+									// Si l'un des nœuds a un conjoint, on augmente l'espace qui lui est accordé
+									const hasConjointA = a.data.conjoint !== null;
+									const hasConjointB = b.data.conjoint !== null;
+									return (hasConjointA || hasConjointB) ? 1.8 : 1.2;
+								});
             const root = d3.hierarchy(rootData);
             treeLayout(root);
 
