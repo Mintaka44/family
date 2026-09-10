@@ -310,7 +310,7 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille') || "Palussiere";
+        const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille');
 
         const storageKey = `arbre_famille_${nomFamilleParam.toLowerCase()}`;
 
@@ -319,7 +319,7 @@
             membres: [] 
         };
 
-        const donneesSauvegardees = localStorage.getItem(storageKey) || (nomFamilleParam.toLowerCase() === "palussiere" ? localStorage.getItem('arbre_famille') : null);
+        const donneesSauvegardees = localStorage.getItem(storageKey) ? localStorage.getItem('arbre_famille') : null);
 
         if (donneesSauvegardees) {
             try {
@@ -332,24 +332,7 @@
                 console.error("Erreur de chargement localStorage", e);
             }
         } else {
-            if (nomFamilleParam.toLowerCase() === "palussiere") {
-                famille.membres = [
-                    { id: "1", prenom: "Sabine", nom: "Palussière", dateNaissance: "01/01/1969", photo: "", conjointId: null, parent1Id: null, parent2Id: null },
-                    { id: "2", prenom: "Melissa", nom: "Palussière", dateNaissance: "14/02/1991", photo: "", conjointId: "3", parent1Id: "1", parent2Id: null },
-                    { id: "3", prenom: "Anthony", nom: "Batilliot", dateNaissance: "22/03/1988", photo: "", conjointId: "2", parent1Id: null, parent2Id: null },
-                    { id: "4", prenom: "Sam", nom: "Palu", dateNaissance: "01/01/2025", photo: "", conjointId: "5", parent1Id: "1", parent2Id: null },
-                    { id: "5", prenom: "Sissy", nom: "Palu", dateNaissance: "01/01/1988", photo: "", conjointId: "4", parent1Id: null, parent2Id: null },
-                    { id: "6", prenom: "Pauline", nom: "Palu", dateNaissance: "01/01/2024", photo: "", conjointId: null, parent1Id: "1", parent2Id: null },
-                    { id: "7", prenom: "Emy", nom: "Petit", dateNaissance: "01/01/2010", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
-                    { id: "8", prenom: "Eden", nom: "Petit", dateNaissance: "01/01/2006", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
-                    { id: "9", prenom: "Ella", nom: "Petit", dateNaissance: "01/01/2021", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
-                    { id: "10", prenom: "Eliott", nom: "Batilliot", dateNaissance: "05/06/2021", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
-                    { id: "11", prenom: "Emma", nom: "", dateNaissance: "01/01/2026", photo: "", conjointId: null, parent1Id: "6", parent2Id: null },
-                    { id: "12", prenom: "Test", nom: "", dateNaissance: "01/01/2026", photo: "", conjointId: null, parent1Id: "4", parent2Id: "5" }
-                ];
-            } else {
-                famille.membres = [];
-            }
+            famille.membres = [];
         }
 
         let modeVueActuelle = 'liste';
