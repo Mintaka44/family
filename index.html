@@ -160,6 +160,9 @@
         <div class="actions-bar">
             <span>Mes arbres généalogiques enregistrés</span>
             <button onclick="ouvrirModalCreation()">➕ Créer une nouvelle famille</button>
+			<!-- Bouton d'import (un input file masqué ou stylisé) -->
+			<input type="file" id="importFile" accept=".json" style="display: none;" onchange="importerJSON(event)">
+			<button onclick="document.getElementById('importFile').click()">📂 Importer un JSON</button>
         </div>
 
         <div id="familles-container" class="familles-grid">
@@ -183,6 +186,41 @@
     </div>
 
     <script>
+		// Fonction pour importer un fichier JSON et écraser/créer les données locales
+		function importerJSON(event) {
+			const file = event.target.files[0];
+			if (!file) return;
+
+			const reader = new FileReader();
+			reader.onload = function(e) {
+				try {
+					const contenu = e.target.result;
+					const dataFamille = JSON.parse(contenu);
+
+					// Vérification que le JSON contient bien un nom de famille
+					if (!dataFamille.nomFamille) {
+						alert("Erreur : Le fichier JSON ne contient pas de nom de famille valide.");
+						return;
+					}
+
+					// Génération dynamique de la clé de stockage correspondante
+					const nomFamille = dataFamille.nomFamille.toLowerCase();
+					const targetKey = `arbre_famille_${nomFamille}`;
+
+					// Sauvegarde dans le localStorage
+					localStorage.setItem(targetKey, contenu);
+					
+					alert(`Import réussi pour la famille "${dataFamille.nomFamille}" !`);
+					
+					// Redirection optionnelle vers la page de cette famille
+					window.location.href = `famille.html?nom=${encodeURIComponent(dataFamille.nomFamille)}`;
+				} catch (err) {
+					alert("Erreur : Le fichier sélectionné n'est pas un fichier JSON valide.");
+					console.error(err);
+				}
+			};
+			reader.readAsText(file);
+		}
         function chargerFamilles() {
             const container = document.getElementById('familles-container');
             container.innerHTML = '';
