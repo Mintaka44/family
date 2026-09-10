@@ -93,6 +93,7 @@
             }
         }
 
+
         .pane {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -100,16 +101,20 @@
             padding: 20px;
         }
 
-        .pane h3 {
-            margin-top: 0;
-            color: #1e293b;
-            font-size: 18px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+		.pane h3 {
+			margin-top: 0;
+			color: #1e293b;
+			font-size: 18px;
+			border-bottom: 2px solid #e2e8f0;
+			padding-bottom: 10px;
+		}
+
+		/* On crée une classe dédiée uniquement au titre du formulaire qui a besoin du bouton "Nouveau" */
+		.pane h3.pane-flex {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
 
         .form-group {
             margin-bottom: 15px;
@@ -246,9 +251,9 @@
 		<h1 id="titre-famille" style="margin-top: 0; margin-bottom: 25px;">Généalogie de la Famille</h1>
 		
 		<div class="actions-bar">
-			<div class="actions-left" style="width: 100%; justify-content: flex-start; gap: 10px; flex-wrap: wrap;">
+			<div class="actions-left" style="width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
 				<button id="btn-toggle-vue" class="btn-action" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
-				<button class="btn-action" onclick="exporterJSON()">💾 Exporter</button>
+				<button class="btn-action" onclick="exporterJSON()">💾 Exporter en JSON</button>
 				<button class="btn-action" onclick="ouvrirCalendrierAnniversaires()">📅 Calendrier Anniversaires</button>
 			</div>
 			<div class="actions-right"></div>
@@ -258,7 +263,7 @@
         <div id="vue-liste" class="view-container active">
             <div class="list-layout">
                 <div class="pane">
-                    <h3 id="form-title">
+                    <h3 id="form-title" class="pane-flex">
                         <span>Ajouter un membre</span>
                         <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="viderFormulaire()">Nouveau</button>
                     </h3>
@@ -310,7 +315,9 @@
                 </div>
 
                 <div class="pane">
-                    <h3>Membres de la famille (<span id="compteur-membres">0</span>)</h3>
+                    <h3 style="margin-top: 0; margin-bottom: 15px; color: #1e293b;">
+						Membres de la famille (<span id="compteur-membres">0</span>)
+					</h3>
                     <div id="liste-membres-container" class="members-list"></div>
                 </div>
             </div>
@@ -442,6 +449,23 @@
             const conteneur = document.getElementById('liste-membres-container');
             conteneur.innerHTML = '';
             document.getElementById('compteur-membres').innerText = famille.membres.length;
+			
+			// Tri des membres du plus âgé au plus jeune (par date de naissance croissante)
+			famille.membres.sort((a, b) => {
+				// Si l'un n'a pas de date, on le met à la fin
+				if (!a.dateNaissance) return 1;
+				if (!b.dateNaissance) return -1;
+
+				const partsA = a.dateNaissance.split('/');
+				const partsB = b.dateNaissance.split('/');
+				
+				if (partsA.length !== 3 || partsB.length !== 3) return 0;
+
+				const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
+				const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
+
+				return dateA - dateB; // Du plus ancien (plus petite date) au plus jeune (plus grande date)
+			});
 
             famille.membres.forEach(m => {
                 const avatar = m.photo ? `<img src="${m.photo}" class="member-item-avatar">` : `<div class="member-item-avatar">👤</div>`;
