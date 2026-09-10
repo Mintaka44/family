@@ -319,7 +319,7 @@
             membres: [] 
         };
 
-        const donneesSauvegardees = localStorage.getItem(storageKey) ? localStorage.getItem('arbre_famille') : null);
+        const donneesSauvegardees = localStorage.getItem(storageKey) || localStorage.getItem('arbre_famille');
 
         if (donneesSauvegardees) {
             try {
