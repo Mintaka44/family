@@ -828,20 +828,78 @@
         }
 
         function telechargerPoster() {
-            const svgElement = document.querySelector("#poster-container svg");
-            if (!svgElement) return;
-            const serializer = new XMLSerializer();
-            let source = serializer.serializeToString(svgElement);
-            source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
-            const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `arbre-genealogique-${famille.nomFamille.toLowerCase()}.svg`;
-            document.exitFullscreen ? document.exitFullscreen() : null;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+			const svgElement = document.querySelector("#poster-container svg");
+			if (!svgElement) return;
+
+			const origWidth = 1600;
+			const origHeight = 900;
+			const extraHeight = 200;
+			const newHeight = origHeight + extraHeight;
+
+			// Cloner le SVG affiché à l'écran
+			const clonedSvg = svgElement.cloneNode(true);
+			clonedSvg.setAttribute("width", origWidth);
+			clonedSvg.setAttribute("height", newHeight);
+			clonedSvg.setAttribute("viewBox", `0 0 ${origWidth} ${newHeight}`);
+
+			// 1. Ajuster le fond blanc pour qu'il couvre toute la nouvelle hauteur
+			const bgRect = clonedSvg.querySelector("rect");
+			if (bgRect) {
+				bgRect.setAttribute("height", newHeight);
+				bgRect.setAttribute("fill", "#ffffff");
+			}
+
+			// 2. Décaler tout l'arbre généalogique vers le bas pour laisser la place au bandeau
+			const groups = clonedSvg.querySelectorAll("svg > g");
+			if (groups.length > 0) {
+				groups[0].setAttribute("transform", `translate(0, ${extraHeight})`);
+			}
+
+			// 3. Créer le groupe du bandeau avec les bonnes dimensions
+			const nomFamilleStr = famille.nomFamille ? famille.nomFamille.toUpperCase() : 'FAMILLE';
+			const bannerWidth = origWidth - 60;
+
+			const bandeauGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+			bandeauGroup.setAttribute("transform", "translate(30, 25)");
+			bandeauGroup.innerHTML = `
+				<defs>
+					<linearGradient id="poster-header-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+						<stop offset="0%" stop-color="#1e293b" />
+						<stop offset="100%" stop-color="#3b82f6" />
+					</linearGradient>
+				</defs>
+				<rect width="${bannerWidth}" height="150" fill="url(#poster-header-grad)" rx="12" />
+				<circle cx="120" cy="75" r="70" fill="rgba(255,255,255,0.03)" />
+				<circle cx="${bannerWidth - 120}" cy="65" r="100" fill="rgba(255,255,255,0.03)" />
+				
+				<g transform="translate(${bannerWidth / 2 - 40}, 20)">
+					<circle cx="40" cy="40" r="30" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+					<text x="40" y="48" font-size="24" text-anchor="middle">🌳</text>
+				</g>
+				
+				<text x="${bannerWidth / 2}" y="110" font-family="'Segoe UI', Tahoma, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">GÉNÉALOGIE DE LA FAMILLE ${nomFamilleStr}</text>
+			`;
+
+			// 4. Insérer le bandeau juste après le fond blanc pour qu'il soit parfaitement visible
+			if (bgRect && bgRect.nextSibling) {
+				clonedSvg.insertBefore(bandeauGroup, bgRect.nextSibling);
+			} else {
+				clonedSvg.appendChild(bandeauGroup);
+			}
+
+			// 5. Téléchargement du fichier SVG
+			const serializer = new XMLSerializer();
+			let source = serializer.serializeToString(clonedSvg);
+			source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+			const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = `arbre-genealogique-${(famille.nomFamille || 'famille').toLowerCase()}.svg`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		}
 
         window.onload = function() {
             rafraichirInterfaceListe();
