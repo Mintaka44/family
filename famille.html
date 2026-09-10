@@ -109,7 +109,6 @@
 			padding-bottom: 10px;
 		}
 
-		/* On crée une classe dédiée uniquement au titre du formulaire qui a besoin du bouton "Nouveau" */
 		.pane h3.pane-flex {
 			display: flex;
 			justify-content: space-between;
@@ -224,7 +223,6 @@
             display: block;
         }
 		
-		/* Style unifié pour tous les boutons d'action principaux */
 		.btn-action {
 			background-color: #3b82f6;
 			color: white;
@@ -243,9 +241,10 @@
 <body>
 
 	<div class="container">
-		<!-- Bouton Accueil isolé en haut à gauche -->
-		<div style="margin-bottom: 10px;">
+		<!-- En-tête supérieur : Accueil à gauche, Exporter en JSON à droite -->
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
 			<button class="btn-action" style="background-color: #64748b; padding: 8px 14px; font-size: 13px;" onclick="retourAccueil()">⬅️ Accueil</button>
+			<button class="btn-action" style="padding: 8px 14px; font-size: 13px;" onclick="exporterJSON()">💾 Exporter en JSON</button>
 		</div>
 
 		<div id="bandeau-famille-container"></div>
@@ -254,7 +253,6 @@
 		<div class="actions-bar">
 			<div class="actions-left" style="width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
 				<button id="btn-toggle-vue" class="btn-action" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
-				<button class="btn-action" onclick="exporterJSON()">💾 Exporter en JSON</button>
 				<button class="btn-action" onclick="ouvrirCalendrierAnniversaires()">📅 Calendrier Anniversaires</button>
 			</div>
 			<div class="actions-right"></div>
@@ -326,19 +324,19 @@
 
         <!-- VUE POSTER VECTORIEL VERTICAL (D3.JS) -->
         <div id="vue-graphique" class="view-container">
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
-                <button class="btn-success" onclick="telechargerPoster()">📥 Télécharger le Poster (SVG)</button>
-            </div>
             <div id="poster-container" style="position: relative;">
                 <div id="tooltip-photo" class="tooltip-photo">
                     <img id="tooltip-img" src="" alt="Photo grand format">
                 </div>
             </div>
+            <!-- Bouton Télécharger le Poster centré et stylisé -->
+            <div style="display: flex; justify-content: center; margin-top: 15px;">
+                <button class="btn-action" onclick="telechargerPoster()">📥 Télécharger le Poster (SVG)</button>
+            </div>
         </div>
     </div>
 
     <script>
-	// Fonction pour exporter les données de la famille active en JSON
 		function exporterJSON() {
 			const donnees = localStorage.getItem(storageKey);
 			if (!donnees) {
@@ -403,17 +401,14 @@
 					</defs>
 					<rect width="1200" height="180" fill="url(#bg-grad)" rx="12" />
 					
-					<!-- Éléments décoratifs en arrière-plan -->
 					<circle cx="120" cy="90" r="70" fill="rgba(255,255,255,0.03)" />
 					<circle cx="1080" cy="70" r="100" fill="rgba(255,255,255,0.03)" />
 					
-					<!-- Icône centrale -->
 					<g transform="translate(560, 25)">
 						<circle cx="40" cy="40" r="30" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
 						<text x="40" y="48" font-size="24" text-anchor="middle">🌳</text>
 					</g>
 
-					<!-- Textes dynamiques -->
 					<text x="600" y="115" font-family="'Segoe UI', Tahoma, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">GÉNÉALOGIE DE LA FAMILLE ${nomFamille}</text>
 					<text x="600" y="142" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle"></text>
 				</svg>
@@ -425,7 +420,7 @@
         }
 
         function sauvegarderStockage() {
-			famille.derniereModification = new Date().toISOString(); // Enregistre la date/heure actuelle au format ISO
+			famille.derniereModification = new Date().toISOString();
             try {
                 localStorage.setItem(storageKey, JSON.stringify(famille));
             } catch (e) {
@@ -485,9 +480,7 @@
             conteneur.innerHTML = '';
             document.getElementById('compteur-membres').innerText = famille.membres.length;
 			
-			// Tri des membres du plus âgé au plus jeune (par date de naissance croissante)
 			famille.membres.sort((a, b) => {
-				// Si l'un n'a pas de date, on le met à la fin
 				if (!a.dateNaissance) return 1;
 				if (!b.dateNaissance) return -1;
 
@@ -499,7 +492,7 @@
 				const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
 				const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
 
-				return dateA - dateB; // Du plus ancien (plus petite date) au plus jeune (plus grande date)
+				return dateA - dateB;
 			});
 
             famille.membres.forEach(m => {
@@ -720,7 +713,6 @@
             const treeLayout = d3.tree()
 								.size([width - 100, height - 200])
 								.separation((a, b) => {
-									// Si l'un des nœuds a un conjoint, on augmente l'espace qui lui est accordé
 									const hasConjointA = a.data.conjoint !== null;
 									const hasConjointB = b.data.conjoint !== null;
 									return (hasConjointA || hasConjointB) ? 1.8 : 1.2;
@@ -728,8 +720,7 @@
             const root = d3.hierarchy(rootData);
             treeLayout(root);
 
-            // Centrage et zoom automatique global initial
-            const initialScale = 0.75; // Ajuste cette valeur si besoin (ex: 0.6 pour dézoomer plus)
+            const initialScale = 0.75;
             const initialX = (width - (width - 300)) / 2 + 50;
             const initialY = 60;
             
@@ -857,7 +848,6 @@
 			afficherBandeauFamille();
         };
 		
-		// Ouvrir et calculer le calendrier chronologique des anniversaires
 		function ouvrirCalendrierAnniversaires() {
 			const conteneur = document.getElementById('liste-anniversaires-contenu');
 			conteneur.innerHTML = '';
@@ -868,17 +858,14 @@
 				return;
 			}
 
-			// Séparer les membres avec et sans date de naissance valide
 			let membresAvecDate = famille.membres.filter(m => m.dateNaissance && m.dateNaissance.split('/').length === 3);
 			let membresSansDate = famille.membres.filter(m => !m.dateNaissance || m.dateNaissance.split('/').length !== 3);
 
-			// Tableau des mois en français
 			const nomsMois = [
 				"Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
 				"Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 			];
 
-			// Trier les membres par ordre chronologique global (mois puis jour)
 			membresAvecDate.sort((a, b) => {
 				const partsA = a.dateNaissance.split('/');
 				const partsB = b.dateNaissance.split('/');
@@ -889,8 +876,6 @@
 			});
 
 			const aujourdhui = new Date();
-
-			// Organiser les membres par mois (index 0 à 11)
 			const calendrierParMois = {};
 			membresAvecDate.forEach(m => {
 				const parts = m.dateNaissance.split('/');
@@ -901,7 +886,6 @@
 				calendrierParMois[moisIndex].push(m);
 			});
 
-			// Générer l'affichage mois par mois
 			nomsMois.forEach((nomMois, indexMois) => {
 				const membresDuMois = calendrierParMois[indexMois];
 				
@@ -943,7 +927,6 @@
 				}
 			});
 
-			// Ajouter la section "Non défini" à la fin si des membres n'ont pas de date
 			if (membresSansDate.length > 0) {
 				const titreNondefini = document.createElement('div');
 				titreNondefini.style.cssText = "font-weight: bold; font-size: 15px; color: #1e293b; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;";
@@ -1007,34 +990,69 @@
 				calendrierParMois[moisIndex].push(m);
 			});
 
-			// Calcul dynamique de la hauteur du SVG avec un espacement plus aéré (25px entre les sections)
-			let totalHeight = 90;
+			// Calcul de la hauteur totale dynamique du SVG
+			let totalHeight = 220; // Espace pour le bandeau supérieur
 			nomsMois.forEach((nomMois, indexMois) => {
 				if (calendrierParMois[indexMois] && calendrierParMois[indexMois].length > 0) {
-					totalHeight += 28; // Titre du mois
-					totalHeight += calendrierParMois[indexMois].length * 54; // Cartes membres
-					totalHeight += 25; // Espace aéré après la section
+					totalHeight += 35; // Titre du mois
+					totalHeight += calendrierParMois[indexMois].length * 60; // Hauteur par carte membre + espacement
+					totalHeight += 20; // Marge entre les mois
 				}
 			});
 			if (membresSansDate.length > 0) {
-				totalHeight += 28;
-				totalHeight += membresSansDate.length * 54;
-				totalHeight += 25;
+				totalHeight += 35;
+				totalHeight += membresSansDate.length * 60;
+				totalHeight += 20;
 			}
-			totalHeight = Math.max(totalHeight, 400);
+			totalHeight = Math.max(totalHeight, 600);
 
-			let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="${totalHeight}" viewBox="0 0 600 ${totalHeight}">`;
-			svgContent += `<rect width="100%" height="100%" fill="#ffffff"/>`;
-			svgContent += `<text x="30" y="45" font-family="'Segoe UI', Tahoma, sans-serif" font-size="20" font-weight="bold" fill="#1e293b">Calendrier des Anniversaires - Famille ${famille.nomFamille || ''}</text>`;
-			svgContent += `<line x1="30" y1="60" x2="570" y2="60" stroke="#e2e8f0" stroke-width="2"/>`;
+			const svgWidth = 800;
 
-			let currentY = 90;
+			let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgWidth}" height="${totalHeight}" viewBox="0 0 ${svgWidth} ${totalHeight}">`;
+			
+			// --- DEFS (Dégradés et ombres) ---
+			svgContent += `
+				<defs>
+					<linearGradient id="header-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+						<stop offset="0%" stop-color="#1e293b" />
+						<stop offset="100%" stop-color="#3b82f6" />
+					</linearGradient>
+					<filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+						<feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.06"/>
+					</filter>
+				</defs>
+			`;
 
+			// Fond général propre
+			svgContent += `<rect width="100%" height="100%" fill="#f8fafc"/>`;
+
+			// --- BANDEAU SUPÉRIEUR STYLE PAGE ---
+			const bannerWidth = svgWidth - 60;
+			svgContent += `
+				<g transform="translate(30, 25)">
+					<rect width="${bannerWidth}" height="140" fill="url(#header-grad)" rx="12" />
+					<circle cx="80" cy="70" r="60" fill="rgba(255,255,255,0.03)" />
+					<circle cx="${bannerWidth - 80}" cy="60" r="80" fill="rgba(255,255,255,0.03)" />
+					
+					<g transform="translate(${bannerWidth / 2 - 40}, 15)">
+						<circle cx="40" cy="35" r="26" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+						<text x="40" y="43" font-size="22" text-anchor="middle">📅</text>
+					</g>
+					
+					<text x="${bannerWidth / 2}" y="95" font-family="'Segoe UI', Tahoma, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">CALENDRIER DES ANNIVERSAIRES</text>
+					<text x="${bannerWidth / 2}" y="118" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" fill="#cbd5e1" text-anchor="middle">Famille ${famille.nomFamille ? famille.nomFamille.toUpperCase() : ''}</text>
+				</g>
+			`;
+
+			let currentY = 195;
+
+			// --- BOUCLE DES MOIS ---
 			nomsMois.forEach((nomMois, indexMois) => {
 				const membresDuMois = calendrierParMois[indexMois];
 				if (membresDuMois && membresDuMois.length > 0) {
-					svgContent += `<text x="30" y="${currentY}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="15" font-weight="bold" fill="#1e293b">${nomMois}</text>`;
-					svgContent += `<line x1="30" y1="${currentY + 6}" x2="570" y2="${currentY + 6}" stroke="#cbd5e1" stroke-width="1"/>`;
+					// Titre du mois avec une petite puce décorative
+					svgContent += `<circle cx="42" cy="${currentY + 2}" r="4" fill="#3b82f6"/>`;
+					svgContent += `<text x="56" y="${currentY + 7}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">${nomMois}</text>`;
 					currentY += 28;
 
 					membresDuMois.forEach(m => {
@@ -1050,50 +1068,57 @@
 							age--;
 						}
 
-						svgContent += `<rect x="30" y="${currentY}" width="540" height="46" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>`;
-						svgContent += `<circle cx="56" cy="${currentY + 23}" r="16" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
+						const ageTexte = !isNaN(age) ? `• ${age} ans` : '';
+						const fullName = `${m.pressom || m.prenom || ''} ${m.nom ? m.nom.toUpperCase() : ''}`;
+
+						// Carte de membre (fond blanc + ombre)
+						svgContent += `<rect x="30" y="${currentY}" width="${svgWidth - 60}" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>`;
+						
+						// Avatar rond
+						svgContent += `<circle cx="58" cy="${currentY + 24}" r="18" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
 						if (m.photo) {
-							svgContent += `<image href="${m.photo}" x="40" y="${currentY + 7}" width="32" height="32" clip-path="circle(16px at 16px 16px)"/>`;
+							svgContent += `<image href="${m.photo}" x="40" y="${currentY + 6}" width="36" height="36" clip-path="circle(18px at 18px 18px)"/>`;
 						} else {
-							svgContent += `<text x="56" y="${currentY + 27}" font-family="sans-serif" font-size="14" text-anchor="middle">👤</text>`;
+							svgContent += `<text x="58" y="${currentY + 29}" font-family="sans-serif" font-size="15" text-anchor="middle">👤</text>`;
 						}
 
-						const fullName = `${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}`;
-						svgContent += `<text x="88" y="${currentY + 19}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${fullName}</text>`;
-						svgContent += `<text x="88" y="${currentY + 35}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Le ${jour} ${nomMois} (${m.dateNaissance})</text>`;
+						// Nom et Prénom
+						svgContent += `<text x="92" y="${currentY + 20}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</text>`;
+						
+						// Date et Âge
+						svgContent += `<text x="92" y="${currentY + 36}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Le ${jour} ${nomMois} ${ageTexte}</text>`;
 
-						currentY += 54;
+						currentY += 56;
 					});
-					currentY += 25; // Espacement vertical augmenté avant le mois suivant
+					currentY += 15;
 				}
 			});
 
-			// Ajout du bloc "Non défini" dans le SVG avec le même espacement
+			// --- MEMBRES SANS DATE ---
 			if (membresSansDate.length > 0) {
-				svgContent += `<text x="30" y="${currentY}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="15" font-weight="bold" fill="#1e293b">Non défini</text>`;
-				svgContent += `<line x1="30" y1="${currentY + 6}" x2="570" y2="${currentY + 6}" stroke="#cbd5e1" stroke-width="1"/>`;
+				svgContent += `<circle cx="42" cy="${currentY + 2}" r="4" fill="#94a3b8"/>`;
+				svgContent += `<text x="56" y="${currentY + 7}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">Date non définie</text>`;
 				currentY += 28;
 
 				membresSansDate.forEach(m => {
-					svgContent += `<rect x="30" y="${currentY}" width="540" height="46" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>`;
-					svgContent += `<circle cx="56" cy="${currentY + 23}" r="16" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
+					svgContent += `<rect x="30" y="${currentY}" width="${svgWidth - 60}" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>`;
+					svgContent += `<circle cx="58" cy="${currentY + 24}" r="18" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
 					if (m.photo) {
-						svgContent += `<image href="${m.photo}" x="40" y="${currentY + 7}" width="32" height="32" clip-path="circle(16px at 16px 16px)"/>`;
+						svgContent += `<image href="${m.photo}" x="40" y="${currentY + 6}" width="36" height="36" clip-path="circle(18px at 18px 18px)"/>`;
 					} else {
-						svgContent += `<text x="56" y="${currentY + 27}" font-family="sans-serif" font-size="14" text-anchor="middle">👤</text>`;
+						svgContent += `<text x="58" y="${currentY + 29}" font-family="sans-serif" font-size="15" text-anchor="middle">👤</text>`;
 					}
 
-					const fullName = `${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}`;
-					svgContent += `<text x="88" y="${currentY + 19}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${fullName}</text>`;
-					svgContent += `<text x="88" y="${currentY + 35}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Date de naissance non renseignée</text>`;
+					svgContent += `<text x="92" y="${currentY + 20}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</text>`;
+					svgContent += `<text x="92" y="${currentY + 36}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Date de naissance non renseignée</text>`;
 
-					currentY += 54;
+					currentY += 56;
 				});
-				currentY += 25;
 			}
 
 			svgContent += `</svg>`;
 
+			// Téléchargement du fichier SVG
 			const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -1114,16 +1139,12 @@
 				<h3 style="margin: 0; color: #1e293b;">🎂 Calendrier des Anniversaires</h3>
 				<button onclick="fermerCalendrierAnniversaires()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b; padding: 0;">✖</button>
 			</div>
-			<!-- Bouton Télécharger le calendrier SVG -->
 			<div style="margin-bottom: 15px;">
 				<button class="btn-action" onclick="telechargerCalendrierSVG()" style="width: 100%; padding: 8px 12px; font-size: 13px;">📥 Télécharger le calendrier (SVG)</button>
 			</div>
-			<div id="liste-anniversaires-contenu" style="display: flex; flex-direction: column; gap: 8px;">
-				<!-- Inséré dynamiquement par JS -->
-			</div>
+			<div id="liste-anniversaires-contenu" style="display: flex; flex-direction: column; gap: 8px;"></div>
 		</div>
 	</div>
-
 
 </body>
 </html>
