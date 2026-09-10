@@ -248,7 +248,8 @@
 			<button class="btn-action" style="background-color: #64748b; padding: 8px 14px; font-size: 13px;" onclick="retourAccueil()">⬅️ Accueil</button>
 		</div>
 
-		<h1 id="titre-famille" style="margin-top: 0; margin-bottom: 25px;">Généalogie de la Famille</h1>
+		<div id="bandeau-famille-container"></div>
+		<h1 id="titre-famille" style="margin-top: 0; margin-bottom: 25px;"></h1>
 		
 		<div class="actions-bar">
 			<div class="actions-left" style="width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
@@ -383,14 +384,48 @@
         let modeVueActuelle = 'liste';
 
         function mettreAJourTitre() {
-            document.getElementById('titre-famille').innerText = `Généalogie de la Famille ${famille.nomFamille}`;
+            document.getElementById('titre-famille').innerText = ``;
         }
+		
+		function afficherBandeauFamille() {
+			const container = document.getElementById('bandeau-famille-container');
+			if (!container) return;
+
+			const nomFamille = famille.nomFamille ? famille.nomFamille.toUpperCase() : 'FAMILLE';
+
+			container.innerHTML = `
+				<svg viewBox="0 0 1200 180" width="100%" style="border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px;">
+					<defs>
+						<linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+							<stop offset="0%" stop-color="#1e293b" />
+							<stop offset="100%" stop-color="#3b82f6" />
+						</linearGradient>
+					</defs>
+					<rect width="1200" height="180" fill="url(#bg-grad)" rx="12" />
+					
+					<!-- Éléments décoratifs en arrière-plan -->
+					<circle cx="120" cy="90" r="70" fill="rgba(255,255,255,0.03)" />
+					<circle cx="1080" cy="70" r="100" fill="rgba(255,255,255,0.03)" />
+					
+					<!-- Icône centrale -->
+					<g transform="translate(560, 25)">
+						<circle cx="40" cy="40" r="30" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+						<text x="40" y="48" font-size="24" text-anchor="middle">🌳</text>
+					</g>
+
+					<!-- Textes dynamiques -->
+					<text x="600" y="115" font-family="'Segoe UI', Tahoma, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">GÉNÉALOGIE DE LA FAMILLE ${nomFamille}</text>
+					<text x="600" y="142" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle"></text>
+				</svg>
+			`;
+		}
 
         function retourAccueil() {
             window.location.href = 'https://mintaka44.github.io/family/index.html';
         }
 
         function sauvegarderStockage() {
+			famille.derniereModification = new Date().toISOString(); // Enregistre la date/heure actuelle au format ISO
             try {
                 localStorage.setItem(storageKey, JSON.stringify(famille));
             } catch (e) {
@@ -819,6 +854,7 @@
 
         window.onload = function() {
             rafraichirInterfaceListe();
+			afficherBandeauFamille();
         };
 		
 		// Ouvrir et calculer le calendrier chronologique des anniversaires
