@@ -218,21 +218,41 @@
             object-fit: cover;
             display: block;
         }
+		
+		/* Style unifié pour tous les boutons d'action principaux */
+		.btn-action {
+			background-color: #3b82f6;
+			color: white;
+			border: none;
+			padding: 10px 18px;
+			border-radius: 8px;
+			cursor: pointer;
+			font-weight: 600;
+			transition: background 0.2s;
+		}
+		.btn-action:hover {
+			background-color: #2563eb;
+		}
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1 id="titre-famille">Généalogie de la Famille</h1>
-        
-        <div class="actions-bar">
-            <div class="actions-left">
-                <button class="btn-secondary" onclick="retourAccueil()">⬅️ Retour</button>
-                <button id="btn-toggle-vue" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
-				<button onclick="exporterJSON()">💾 Exporter en JSON</button>
-            </div>
-            <div class="actions-right"></div>
-        </div>
+	<div class="container">
+		<!-- Bouton Accueil isolé en haut à gauche -->
+		<div style="margin-bottom: 10px;">
+			<button class="btn-action" style="background-color: #64748b; padding: 8px 14px; font-size: 13px;" onclick="retourAccueil()">⬅️ Accueil</button>
+		</div>
+
+		<h1 id="titre-famille" style="margin-top: 0; margin-bottom: 25px;">Généalogie de la Famille</h1>
+		
+		<div class="actions-bar">
+			<div class="actions-left" style="width: 100%; justify-content: flex-start; gap: 10px; flex-wrap: wrap;">
+				<button id="btn-toggle-vue" class="btn-action" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
+				<button class="btn-action" onclick="exporterJSON()">💾 Exporter en JSON</button>
+				<button class="btn-action" onclick="ouvrirCalendrierAnniversaires()">📅 Calendrier Anniversaires</button>
+			</div>
+			<div class="actions-right"></div>
+		</div>
 
         <!-- VUE LISTE & FORMULAIRE -->
         <div id="vue-liste" class="view-container active">
@@ -511,6 +531,27 @@
             viderFormulaire();
             rafraichirInterfaceListe();
         }
+		
+		function formaterDateAvecAge(dateStr) {
+			if (!dateStr) return "";
+			const parts = dateStr.split('/');
+			if (parts.length !== 3) return dateStr;
+			
+			const jour = parseInt(parts[0], 10);
+			const mois = parseInt(parts[1], 10) - 1;
+			const annee = parseInt(parts[2], 10);
+			
+			const naissance = new Date(annee, mois, jour);
+			const aujourdhui = new Date();
+			
+			let age = aujourdhui.getFullYear() - naissance.getFullYear();
+			const m = aujourdhui.getMonth() - naissance.getMonth();
+			if (m < 0 || (m === 0 && aujourdhui.getDate() < naissance.getDate())) {
+				age--;
+			}
+			
+			return isNaN(age) ? dateStr : `${dateStr} - ${age} ans`;
+		}
 
         function supprimerMembreActuel() {
             const idMembre = document.getElementById('membre-id').value;
@@ -702,7 +743,7 @@
 
                 const txt1 = g1.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p1.id); });
                 txt1.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p1.prenom);
-                txt1.append("text").attr("x", 50).attr("y", 34).style("font-size", "9px").style("fill", "#64748b").text(p1.dateNaissance || "");
+                txt1.append("text").attr("x", 50).attr("y", 34).style("font-size", "8.5px").style("fill", "#64748b").text(formaterDateAvecAge(p1.dateNaissance));
 
                 if (hasConjoint) {
                     el.append("text").attr("x", 0).attr("y", 5).style("font-size", "16px").text("❤️").style("text-anchor", "middle");
@@ -731,7 +772,7 @@
 
                     const txt2 = g2.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
                     txt2.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p2.prenom);
-                    txt2.append("text").attr("x", 50).attr("y", 34).style("font-size", "9px").style("fill", "#64748b").text(p2.dateNaissance || "");
+                    txt2.append("text").attr("x", 50).attr("y", 34).style("font-size", "8.5px").style("fill", "#64748b").text(formaterDateAvecAge(p2.dateNaissance));
                 }
             });
         }
@@ -755,6 +796,232 @@
         window.onload = function() {
             rafraichirInterfaceListe();
         };
+		
+		// Ouvrir et calculer le calendrier chronologique des anniversaires
+		function ouvrirCalendrierAnniversaires() {
+			const conteneur = document.getElementById('liste-anniversaires-contenu');
+			conteneur.innerHTML = '';
+
+			// Filtrer les membres ayant une date de naissance valide
+			let membresAvecDate = famille.membres.filter(m => m.dateNaissance && m.dateNaissance.split('/').length === 3);
+
+			if (membresAvecDate.length === 0) {
+				conteneur.innerHTML = '<p style="text-align: center; color: #64748b;">Aucune date de naissance renseignée pour cette famille.</p>';
+				document.getElementById('modal-anniversaires').style.display = 'flex';
+				return;
+			}
+
+			// Tableau des mois en français
+			const nomsMois = [
+				"Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+				"Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+			];
+
+			// Trier les membres par ordre chronologique global (mois puis jour)
+			membresAvecDate.sort((a, b) => {
+				const partsA = a.dateNaissance.split('/');
+				const partsB = b.dateNaissance.split('/');
+				const moisA = parseInt(partsA[1], 10);
+				const moisB = parseInt(partsB[1], 10);
+				if (moisA !== moisB) return moisA - moisB;
+				return parseInt(partsA[0], 10) - parseInt(partsB[0], 10);
+			});
+
+			const aujourdhui = new Date();
+
+			// Organiser les membres par mois (index 0 à 11)
+			const calendrierParMois = {};
+			membresAvecDate.forEach(m => {
+				const parts = m.dateNaissance.split('/');
+				const moisIndex = parseInt(parts[1], 10) - 1;
+				if (!calendrierParMois[moisIndex]) {
+					calendrierParMois[moisIndex] = [];
+				}
+				calendrierParMois[moisIndex].push(m);
+			});
+
+			// Générer l'affichage mois par mois
+			nomsMois.forEach((nomMois, indexMois) => {
+				const membresDuMois = calendrierParMois[indexMois];
+				
+				// On n'affiche que les mois qui contiennent des anniversaires pour garder un calendrier propre
+				if (membresDuMois && membresDuMois.length > 0) {
+					// Titre du mois
+					const titreMois = document.createElement('div');
+					titreMois.style.cssText = "font-weight: bold; font-size: 15px; color: #1e293b; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;";
+					titreMois.innerText = nomMois;
+					conteneur.appendChild(titreMois);
+
+					// Liste des membres pour ce mois
+					membresDuMois.forEach(m => {
+						const parts = m.dateNaissance.split('/');
+						const jour = parseInt(parts[0], 10);
+						const mois = parseInt(parts[1], 10) - 1;
+						const annee = parseInt(parts[2], 10);
+
+						const naissance = new Date(annee, mois, jour);
+						let age = aujourdhui.getFullYear() - naissance.getFullYear();
+						const diffMois = aujourdhui.getMonth() - naissance.getMonth();
+						if (diffMois < 0 || (diffMois === 0 && aujourdhui.getDate() < naissance.getDate())) {
+							age--;
+						}
+
+						const avatar = m.photo ? `<img src="${m.photo}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid #cbd5e1;">` : `<div style="width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 13px;">👤</div>`;
+
+						const ageTexte = !isNaN(age) ? ` - actuellement a ${age} ans` : '';
+
+						const item = document.createElement('div');
+						item.style.cssText = "display: flex; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 6px;";
+						item.innerHTML = `
+							<div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+								${avatar}
+								<div>
+									<div style="font-weight: bold; font-size: 13px; color: #0f172a;">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</div>
+									<div style="font-size: 11px; color: #64748b;">Le ${jour} ${nomMois} (${m.dateNaissance}${ageTexte})</div>
+								</div>
+							</div>
+						`;
+						conteneur.appendChild(item);
+					});
+				}
+			});
+
+			document.getElementById('modal-anniversaires').style.display = 'flex';
+		}
+
+		function fermerCalendrierAnniversaires() {
+			document.getElementById('modal-anniversaires').style.display = 'none';
+		}
+		
+		function telechargerCalendrierSVG() {
+		let membresAvecDate = famille.membres.filter(m => m.dateNaissance && m.dateNaissance.split('/').length === 3);
+
+		if (membresAvecDate.length === 0) {
+			alert("Aucune date de naissance à exporter.");
+			return;
+		}
+
+		const nomsMois = [
+			"Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+			"Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+		];
+
+		// Trier les membres par mois et jour
+		membresAvecDate.sort((a, b) => {
+			const partsA = a.dateNaissance.split('/');
+			const partsB = b.dateNaissance.split('/');
+			const moisA = parseInt(partsA[1], 10);
+			const moisB = parseInt(partsB[1], 10);
+			if (moisA !== moisB) return moisA - moisB;
+			return parseInt(partsA[0], 10) - parseInt(partsB[0], 10);
+		});
+
+		const aujourdhui = new Date();
+		const calendrierParMois = {};
+		membresAvecDate.forEach(m => {
+			const parts = m.dateNaissance.split('/');
+			const moisIndex = parseInt(parts[1], 10) - 1;
+			if (!calendrierParMois[moisIndex]) calendrierParMois[moisIndex] = [];
+			calendrierParMois[moisIndex].push(m);
+		});
+
+		// Calcul dynamique de la hauteur du SVG en fonction du contenu
+		let totalHeight = 90;
+		nomsMois.forEach((nomMois, indexMois) => {
+			if (calendrierParMois[indexMois] && calendrierParMois[indexMois].length > 0) {
+				totalHeight += 35; // Titre du mois
+				totalHeight += calendrierParMois[indexMois].length * 56; // Cartes des membres
+			}
+		});
+		totalHeight = Math.max(totalHeight, 400);
+
+		// Construction du code SVG textuel
+		let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="${totalHeight}" viewBox="0 0 600 ${totalHeight}">`;
+		svgContent += `<rect width="100%" height="100%" fill="#ffffff"/>`;
+		
+		// En-tête du document SVG
+		svgContent += `<text x="30" y="45" font-family="'Segoe UI', Tahoma, sans-serif" font-size="20" font-weight="bold" fill="#1e293b">Calendrier des Anniversaires - Famille ${famille.nomFamille || ''}</text>`;
+		svgContent += `<line x1="30" y1="60" x2="570" y2="60" stroke="#e2e8f0" stroke-width="2"/>`;
+
+		let currentY = 90;
+
+		nomsMois.forEach((nomMois, indexMois) => {
+			const membresDuMois = calendrierParMois[indexMois];
+			if (membresDuMois && membresDuMois.length > 0) {
+				// Titre du mois
+				svgContent += `<text x="30" y="${currentY}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="15" font-weight="bold" fill="#1e293b">${nomMois}</text>`;
+				svgContent += `<line x1="30" y1="${currentY + 6}" x2="570" y2="${currentY + 6}" stroke="#cbd5e1" stroke-width="1"/>`;
+				currentY += 28;
+
+				membresDuMois.forEach(m => {
+					const parts = m.dateNaissance.split('/');
+					const jour = parseInt(parts[0], 10);
+					const mois = parseInt(parts[1], 10) - 1;
+					const annee = parseInt(parts[2], 10);
+
+					const naissance = new Date(annee, mois, jour);
+					let age = aujourdhui.getFullYear() - naissance.getFullYear();
+					const diffMois = aujourdhui.getMonth() - naissance.getMonth();
+					if (diffMois < 0 || (diffMois === 0 && aujourdhui.getDate() < naissance.getDate())) {
+						age--;
+					}
+					const ageTexte = !isNaN(age) ? `` : '';
+
+					// Fond de la carte membre
+					svgContent += `<rect x="30" y="${currentY}" width="540" height="46" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>`;
+
+					// Avatar (Image Base64 ou icône par défaut)
+					svgContent += `<circle cx="56" cy="${currentY + 23}" r="16" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
+					if (m.photo) {
+						svgContent += `<image href="${m.photo}" x="40" y="${currentY + 7}" width="32" height="32" clip-path="circle(16px at 16px 16px)"/>`;
+					} else {
+						svgContent += `<text x="56" y="${currentY + 27}" font-family="sans-serif" font-size="14" text-anchor="middle">👤</text>`;
+					}
+
+					// Textes (Nom + Date/Âge)
+					const fullName = `${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}`;
+					svgContent += `<text x="88" y="${currentY + 19}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${fullName}</text>`;
+					svgContent += `<text x="88" y="${currentY + 35}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Le ${jour} ${nomMois} (${m.dateNaissance}${ageTexte})</text>`;
+
+					currentY += 54;
+				});
+				currentY += 10;
+			}
+		});
+
+		svgContent += `</svg>`;
+
+		// Déclenchement du téléchargement du fichier SVG
+		const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `calendrier-anniversaires-${(famille.nomFamille || 'famille').toLowerCase()}.svg`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
     </script>
+	
+
+	<!-- Modal Calendrier des Anniversaires -->
+	<div id="modal-anniversaires" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+		<div style="background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+			<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px;">
+				<h3 style="margin: 0; color: #1e293b;">🎂 Calendrier des Anniversaires</h3>
+				<button onclick="fermerCalendrierAnniversaires()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748b; padding: 0;">✖</button>
+			</div>
+			<!-- Bouton Télécharger le calendrier SVG -->
+			<div style="margin-bottom: 15px;">
+				<button class="btn-action" onclick="telechargerCalendrierSVG()" style="width: 100%; padding: 8px 12px; font-size: 13px;">📥 Télécharger le calendrier (SVG)</button>
+			</div>
+			<div id="liste-anniversaires-contenu" style="display: flex; flex-direction: column; gap: 8px;">
+				<!-- Inséré dynamiquement par JS -->
+			</div>
+		</div>
+	</div>
+
+
 </body>
 </html>
