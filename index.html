@@ -7,57 +7,71 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
+            background-color: #f1f5f9;
             margin: 0;
-            padding: 20px;
-            color: #333;
+            padding: 40px 20px;
+            color: #0f172a;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-        }
-
-        .actions-bar {
+        /* En-tête type Dashboard moderne */
+        .header-accueil {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            background: white;
+            padding: 24px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header-accueil h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-actions {
+            display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 15px;
         }
 
-        .actions-bar span {
-            font-weight: 600;
-            color: #475569;
-            font-size: 16px;
-        }
-
+        /* Style unifié des boutons */
         button {
             background-color: #3b82f6;
             color: white;
             border: none;
-            padding: 10px 18px;
+            padding: 10px 16px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
-            transition: background 0.2s;
+            font-size: 13px;
+            transition: background 0.2s, transform 0.1s;
         }
 
         button:hover {
             background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+        .btn-secondary:hover {
+            background-color: #e2e8f0;
+            color: #1e293b;
         }
 
         .btn-danger {
@@ -67,42 +81,46 @@
             background-color: #dc2626;
         }
 
-        .btn-secondary {
-            background-color: #64748b;
-        }
-        .btn-secondary:hover {
-            background-color: #475569;
+        /* Section titre pour la liste */
+        .section-titre {
+            font-size: 15px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         /* Grille des familles */
         .familles-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
         }
 
         .famille-card {
-            background: #f8fafc;
+            background: white;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 20px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
             transition: all 0.2s;
         }
 
         .famille-card:hover {
             border-color: #3b82f6;
-            box-shadow: 0 4px 12px rgba(59,130,246,0.1);
+            box-shadow: 0 10px 20px -5px rgba(59,130,246,0.1);
             transform: translateY(-2px);
         }
 
         .famille-info h3 {
             margin-top: 0;
             color: #1e293b;
-            font-size: 18px;
-            margin-bottom: 5px;
+            font-size: 17px;
+            margin-bottom: 6px;
         }
 
         .famille-info p {
@@ -148,22 +166,25 @@
         .modal-content h3 { margin-top: 0; color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #475569; }
-        .form-group input { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .form-group input { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Gestion et Arbre Généalogique</h1>
-        
-        <div class="actions-bar">
-            <span>Mes arbres généalogiques enregistrés</span>
-            <button onclick="ouvrirModalCreation()">➕ Créer une nouvelle famille</button>
-			<!-- Bouton d'import (un input file masqué ou stylisé) -->
-			<input type="file" id="importFile" accept=".json" style="display: none;" onchange="importerJSON(event)">
-			<button onclick="document.getElementById('importFile').click()">📂 Importer une famille</button>
+        <!-- En-tête moderne regroupant le titre et les actions principales -->
+        <div class="header-accueil">
+            <h1>🌳 Gestion et Arbre Généalogique</h1>
+            <div class="header-actions">
+                <button onclick="ouvrirModalCreation()">➕ Créer une famille</button>
+                <!-- Input file masqué déclenché par le bouton Importer -->
+                <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importerJSON(event)">
+                <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Importer</button>
+            </div>
         </div>
+
+        <div class="section-titre">Arbres généalogiques enregistrés</div>
 
         <div id="familles-container" class="familles-grid">
             <!-- Les cartes des familles s'afficheront ici dynamiquement -->
@@ -221,14 +242,12 @@
 			};
 			reader.readAsText(file);
 		}
+
         function chargerFamilles() {
             const container = document.getElementById('familles-container');
             container.innerHTML = '';
 
             let famillesTrouvees = [];
-
-            const ancienneDonnee = localStorage.getItem('arbre_famille');
-
 
             for (let i = 0; i < localStorage.length; i++) {
                 const cle = localStorage.key(i);
@@ -239,8 +258,6 @@
                     }
                 }
             }
-
-
 
             famillesTrouvees.forEach(fam => {
                 let nbMembres = 0;
