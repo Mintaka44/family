@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion et Arbre Généalogique Poster Vertical</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .actions-left, .actions-right {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: #64748b;
+        }
+        .btn-secondary:hover {
+            background-color: #475569;
+        }
+
+        .btn-success {
+            background-color: #10b981;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+
+        .view-container {
+            display: none;
+        }
+        .view-container.active {
+            display: block;
+        }
+
+        /* --- VUE LISTE & FORMULAIRE --- */
+        .list-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 25px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .list-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pane {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .pane h3 {
+            margin-top: 0;
+            color: #1e293b;
+            font-size: 18px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background: #ffffff;
+        }
+
+        .members-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .member-item:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            transform: translateY(-1px);
+        }
+
+        .member-item-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .member-item-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* --- VUE POSTER D3.JS VERTICAL --- */
+        #poster-container {
+            width: 100%;
+            height: 700px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: auto;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .node:hover rect {
+            stroke: #3b82f6;
+            filter: drop-shadow(0 4px 8px rgba(59,130,246,0.2));
+            cursor: pointer;
+        }
+
+        .tooltip-photo {
+            position: absolute;
+            display: none;
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border: 1px solid #cbd5e1;
+            z-index: 1000;
+            pointer-events: none;
+            text-align: center;
+        }
+        .tooltip-photo img {
+            width: 120px;
+            height: 120px;
+            border-radius: 6px;
+            object-fit: cover;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 id="titre-famille">Généalogie de la Famille</h1>
+        
+        <div class="actions-bar">
+            <div class="actions-left">
+                <button class="btn-secondary" onclick="retourAccueil()">⬅️ Retour</button>
+                <button id="btn-toggle-vue" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
+            </div>
+            <div class="actions-right"></div>
+        </div>
+
+        <!-- VUE LISTE & FORMULAIRE -->
+        <div id="vue-liste" class="view-container active">
+            <div class="list-layout">
+                <div class="pane">
+                    <h3 id="form-title">
+                        <span>Ajouter un membre</span>
+                        <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="viderFormulaire()">Nouveau</button>
+                    </h3>
+                    <form id="membre-form" onsubmit="sauvegarderMembre(event)">
+                        <input type="hidden" id="membre-id">
+                        <div class="form-group">
+                            <label for="prenom">Prénom</label>
+                            <input type="text" id="prenom" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nom">Nom</label>
+                            <input type="text" id="nom" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="date-naissance">Date de naissance</label>
+                            <input type="text" id="date-naissance" placeholder="ex: 01/01/1980">
+                        </div>
+                        <div class="form-group">
+                            <label for="photo-input">Photo du membre</label>
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
+                                <img id="aperçu-photo" src="" alt="Aperçu" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid #cbd5e1; background: #f1f5f9; display: none;">
+                                <input type="file" id="photo-input" accept="image/*" onchange="convertirImageEnBase64(event)">
+                            </div>
+                            <input type="hidden" id="photo-base64">
+                        </div>
+                        <div class="form-group">
+                            <label for="conjoint-select">Conjoint(e)</label>
+                            <select id="conjoint-select">
+                                <option value="">Aucun</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="parent1-select">Parent 1</label>
+                            <select id="parent1-select">
+                                <option value="">Aucun</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="parent2-select">Parent 2 (Optionnel)</label>
+                            <select id="parent2-select">
+                                <option value="">Aucun</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                            <button type="button" class="btn-secondary" onclick="supprimerMembreActuel()" id="btn-supprimer" style="background-color: #ef4444; display: none;">Supprimer</button>
+                            <button type="submit" class="btn-success">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="pane">
+                    <h3>Membres de la famille (<span id="compteur-membres">0</span>)</h3>
+                    <div id="liste-membres-container" class="members-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VUE POSTER VECTORIEL VERTICAL (D3.JS) -->
+        <div id="vue-graphique" class="view-container">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                <button class="btn-success" onclick="telechargerPoster()">📥 Télécharger le Poster (SVG)</button>
+            </div>
+            <div id="poster-container" style="position: relative;">
+                <div id="tooltip-photo" class="tooltip-photo">
+                    <img id="tooltip-img" src="" alt="Photo grand format">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const nomFamilleParam = urlParams.get('nom') || urlParams.get('famille') || "Palussiere";
+
+        const storageKey = `arbre_famille_${nomFamilleParam.toLowerCase()}`;
+
+        let famille = {
+            nomFamille: nomFamilleParam,
+            membres: [] 
+        };
+
+        const donneesSauvegardees = localStorage.getItem(storageKey) || (nomFamilleParam.toLowerCase() === "palussiere" ? localStorage.getItem('arbre_famille') : null);
+
+        if (donneesSauvegardees) {
+            try {
+                let saved = JSON.parse(donneesSauvegardees);
+                famille.membres = saved.membres || [];
+                if (saved.nomFamille) {
+                    famille.nomFamille = saved.nomFamille;
+                }
+            } catch (e) {
+                console.error("Erreur de chargement localStorage", e);
+            }
+        } else {
+            if (nomFamilleParam.toLowerCase() === "palussiere") {
+                famille.membres = [
+                    { id: "1", prenom: "Sabine", nom: "Palussière", dateNaissance: "01/01/1969", photo: "", conjointId: null, parent1Id: null, parent2Id: null },
+                    { id: "2", prenom: "Melissa", nom: "Palussière", dateNaissance: "14/02/1991", photo: "", conjointId: "3", parent1Id: "1", parent2Id: null },
+                    { id: "3", prenom: "Anthony", nom: "Batilliot", dateNaissance: "22/03/1988", photo: "", conjointId: "2", parent1Id: null, parent2Id: null },
+                    { id: "4", prenom: "Sam", nom: "Palu", dateNaissance: "01/01/2025", photo: "", conjointId: "5", parent1Id: "1", parent2Id: null },
+                    { id: "5", prenom: "Sissy", nom: "Palu", dateNaissance: "01/01/1988", photo: "", conjointId: "4", parent1Id: null, parent2Id: null },
+                    { id: "6", prenom: "Pauline", nom: "Palu", dateNaissance: "01/01/2024", photo: "", conjointId: null, parent1Id: "1", parent2Id: null },
+                    { id: "7", prenom: "Emy", nom: "Petit", dateNaissance: "01/01/2010", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
+                    { id: "8", prenom: "Eden", nom: "Petit", dateNaissance: "01/01/2006", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
+                    { id: "9", prenom: "Ella", nom: "Petit", dateNaissance: "01/01/2021", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
+                    { id: "10", prenom: "Eliott", nom: "Batilliot", dateNaissance: "05/06/2021", photo: "", conjointId: null, parent1Id: "2", parent2Id: "3" },
+                    { id: "11", prenom: "Emma", nom: "", dateNaissance: "01/01/2026", photo: "", conjointId: null, parent1Id: "6", parent2Id: null },
+                    { id: "12", prenom: "Test", nom: "", dateNaissance: "01/01/2026", photo: "", conjointId: null, parent1Id: "4", parent2Id: "5" }
+                ];
+            } else {
+                famille.membres = [];
+            }
+        }
+
+        let modeVueActuelle = 'liste';
+
+        function mettreAJourTitre() {
+            document.getElementById('titre-famille').innerText = `Généalogie de la Famille ${famille.nomFamille}`;
+        }
+
+        function retourAccueil() {
+            window.location.href = 'index.html';
+        }
+
+        function sauvegarderStockage() {
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(famille));
+            } catch (e) {
+                alert("Erreur : Espace de stockage plein.");
+            }
+        }
+
+        function basculerVue() {
+            const vueListe = document.getElementById('vue-liste');
+            const vueGraphique = document.getElementById('vue-graphique');
+            const btnToggle = document.getElementById('btn-toggle-vue');
+
+            if (modeVueActuelle === 'liste') {
+                modeVueActuelle = 'graphique';
+                vueListe.classList.remove('active');
+                vueGraphique.classList.add('active');
+                btnToggle.innerText = "📋 Afficher la liste et gestion";
+                genererPosterD3Vertical();
+            } else {
+                modeVueActuelle = 'liste';
+                vueGraphique.classList.remove('active');
+                vueListe.classList.add('active');
+                btnToggle.innerText = "✨ Afficher le Poster Vertical";
+                rafraichirInterfaceListe();
+            }
+        }
+
+        function convertirImageEnBase64(event) {
+            const fichier = event.target.files[0];
+            if (!fichier) return;
+            const lecteur = new FileReader();
+            lecteur.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const MAX = 150;
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+                    else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById('photo-base64').value = base64;
+                    const apercu = document.getElementById('aperçu-photo');
+                    apercu.src = base64;
+                    apercu.style.display = 'block';
+                };
+                img.src = e.target.result;
+            };
+            lecteur.readAsDataURL(fichier);
+        }
+
+        function rafraichirInterfaceListe() {
+            mettreAJourTitre();
+            const conteneur = document.getElementById('liste-membres-container');
+            conteneur.innerHTML = '';
+            document.getElementById('compteur-membres').innerText = famille.membres.length;
+
+            famille.membres.forEach(m => {
+                const avatar = m.photo ? `<img src="${m.photo}" class="member-item-avatar">` : `<div class="member-item-avatar">👤</div>`;
+                const div = document.createElement('div');
+                div.className = 'member-item';
+                div.onclick = () => chargerMembreDansFormulaire(m.id);
+                div.innerHTML = `
+                    <div class="member-item-info">
+                        ${avatar}
+                        <div>
+                            <div style="font-weight: bold; font-size: 13px;">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</div>
+                            <div style="font-size: 11px; color: #64748b;">${m.dateNaissance || 'Date non renseignée'}</div>
+                        </div>
+                    </div>
+                    <span style="font-size: 12px; color: #3b82f6; font-weight: 600;">Modifier ✏️</span>
+                `;
+                conteneur.appendChild(div);
+            });
+            remplirSelects();
+        }
+
+        function remplirSelects(exclureId = null) {
+            ['conjoint-select', 'parent1-select', 'parent2-select'].forEach(id => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = '<option value="">Aucun</option>';
+                famille.membres.forEach(m => {
+                    if (m.id === exclureId) return;
+                    sel.add(new Option(`${m.prenom} ${m.nom || ''}`, m.id));
+                });
+            });
+        }
+
+        function viderFormulaire() {
+            document.getElementById('form-title').querySelector('span').innerText = "Ajouter un membre";
+            document.getElementById('membre-id').value = "";
+            document.getElementById('prenom').value = "";
+            document.getElementById('nom').value = "";
+            document.getElementById('date-naissance').value = "";
+            document.getElementById('photo-input').value = "";
+            document.getElementById('photo-base64').value = "";
+            document.getElementById('aperçu-photo').style.display = 'none';
+            document.getElementById('btn-supprimer').style.display = 'none';
+            remplirSelects();
+        }
+
+        function chargerMembreDansFormulaire(id) {
+            const m = famille.membres.find(item => item.id === id);
+            if (!m) return;
+            document.getElementById('form-title').querySelector('span').innerText = "Modifier : " + m.prenom;
+            document.getElementById('membre-id').value = m.id;
+            document.getElementById('prenom').value = m.prenom;
+            document.getElementById('nom').value = m.nom || "";
+            document.getElementById('date-naissance').value = m.dateNaissance || "";
+            document.getElementById('photo-base64').value = m.photo || "";
+            const apercu = document.getElementById('aperçu-photo');
+            if (m.photo) { apercu.src = m.photo; apercu.style.display = 'block'; } else { apercu.style.display = 'none'; }
+            remplirSelects(m.id);
+            document.getElementById('conjoint-select').value = m.conjointId || "";
+            document.getElementById('parent1-select').value = m.parent1Id || "";
+            document.getElementById('parent2-select').value = m.parent2Id || "";
+            document.getElementById('btn-supprimer').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function sauvegarderMembre(event) {
+            event.preventDefault();
+            const idMembre = document.getElementById('membre-id').value;
+            const prenom = document.getElementById('prenom').value;
+            const nom = document.getElementById('nom').value;
+            const dateNaissance = document.getElementById('date-naissance').value;
+            const photo = document.getElementById('photo-base64').value;
+            const conjointId = document.getElementById('conjoint-select').value || null;
+            const parent1Id = document.getElementById('parent1-select').value || null;
+            const parent2Id = document.getElementById('parent2-select').value || null;
+
+            if (idMembre) {
+                const m = famille.membres.find(item => item.id === idMembre);
+                if (m) {
+                    m.prenom = prenom; m.nom = nom; m.dateNaissance = dateNaissance;
+                    if (photo) m.photo = photo;
+                    m.conjointId = conjointId; m.parent1Id = parent1Id; m.parent2Id = parent2Id;
+                }
+            } else {
+                famille.membres.push({ id: Date.now().toString(), prenom, nom, dateNaissance, photo, conjointId, parent1Id, parent2Id });
+            }
+            sauvegarderStockage();
+            viderFormulaire();
+            rafraichirInterfaceListe();
+        }
+
+        function supprimerMembreActuel() {
+            const idMembre = document.getElementById('membre-id').value;
+            if (!idMembre || !confirm("Supprimer ce membre ?")) return;
+            famille.membres = famille.membres.filter(m => m.id !== idMembre);
+            famille.membres.forEach(m => {
+                if (m.conjointId === idMembre) m.conjointId = null;
+                if (m.parent1Id === idMembre) m.parent1Id = null;
+                if (m.parent2Id === idMembre) m.parent2Id = null;
+            });
+            sauvegarderStockage();
+            viderFormulaire();
+            rafraichirInterfaceListe();
+        }
+
+        function genererPosterD3Vertical() {
+            mettreAJourTitre();
+            const container = document.getElementById('poster-container');
+            const tooltip = document.getElementById('tooltip-photo');
+            const tooltipImg = document.getElementById('tooltip-img');
+            container.innerHTML = '';
+            container.appendChild(tooltip);
+
+            let traiteSet = new Set();
+
+            function construireNoeudHierarchique(pId) {
+                const p = famille.membres.find(x => x.id === pId);
+                if (!p || traiteSet.has(p.id)) return null;
+                traiteSet.add(p.id);
+
+                let conjointObj = null;
+                if (p.conjointId) {
+                    const c = famille.membres.find(x => x.id === p.conjointId);
+                    if (c && !traiteSet.has(c.id)) {
+                        traiteSet.add(c.id);
+                        conjointObj = c;
+                    }
+                }
+
+                const enfantsData = famille.membres.filter(m => 
+                    m.parent1Id === p.id || m.parent2Id === p.id || 
+                    (conjointObj && (m.parent1Id === conjointObj.id || m.parent2Id === conjointObj.id))
+                ).sort((a, b) => {
+                    function parseDate(str) {
+                        if (!str) return new Date(9999, 0, 1);
+                        const parts = str.split('/');
+                        if (parts.length !== 3) return new Date(9999, 0, 1);
+                        return new Date(parts[2], parts[1] - 1, parts[0]);
+                    }
+                    return parseDate(a.dateNaissance) - parseDate(b.dateNaissance);
+                });
+
+                return {
+                    personne: p,
+                    conjoint: conjointObj,
+                    children: enfantsData.map(e => construireNoeudHierarchique(e.id)).filter(Boolean)
+                };
+            }
+
+            let rootData = { personne: null, children: [] };
+
+            const racines = famille.membres.filter(m => !m.parent1Id && !m.parent2Id);
+            racines.forEach(r => {
+                const noeud = construireNoeudHierarchique(r.id);
+                if (noeud) rootData.children.push(noeud);
+            });
+
+            famille.membres.forEach(m => {
+                if (!traiteSet.has(m.id)) {
+                    const noeud = construireNoeudHierarchique(m.id);
+                    if (noeud) rootData.children.push(noeud);
+                }
+            });
+
+            const width = 1600;
+            const height = 900;
+
+            const svg = d3.select("#poster-container")
+                .append("svg")
+                .attr("width", "100%")
+                .attr("height", "100%")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("preserveAspectRatio", "xMidYMid meet");
+
+            svg.append("rect")
+                .attr("width", "100%")
+                .attr("height", "100%")
+                .attr("fill", "#ffffff");
+
+            const zoom = d3.zoom()
+                .scaleExtent([0.2, 3])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                });
+
+            const svgGroup = svg.append("g").call(zoom);
+
+            svgGroup.append("rect")
+                .attr("width", width * 3)
+                .attr("height", height * 3)
+                .attr("x", -width)
+                .attr("y", -height)
+                .attr("fill", "transparent");
+
+            const g = svgGroup.append("g");
+
+            const treeLayout = d3.tree().size([width - 300, height - 200]);
+            const root = d3.hierarchy(rootData);
+            treeLayout(root);
+
+            // Centrage et zoom automatique global initial
+            const initialScale = 0.75; // Ajuste cette valeur si besoin (ex: 0.6 pour dézoomer plus)
+            const initialX = (width - (width - 300)) / 2 + 50;
+            const initialY = 60;
+            
+            svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
+
+            g.selectAll("path")
+                .data(root.links())
+                .enter()
+                .append("path")
+                .attr("fill", "none")
+                .attr("stroke", d => d.source.data.personne === null ? "transparent" : "#64748b")
+                .attr("stroke-width", d => d.source.data.personne === null ? "0px" : "2px")
+                .attr("d", d3.linkVertical()
+                    .x(d => d.x)
+                    .y(d => d.y)
+                );
+
+            const node = g.selectAll(".node")
+                .data(root.descendants().filter(d => d.data.personne !== null && d.data.personne.id))
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+
+            function gererEvenementsPhoto(selection, personne) {
+                if (!personne.photo) return;
+                selection
+                    .style("cursor", "zoom-in")
+                    .on("mousemove", (event) => {
+                        tooltipImg.src = personne.photo;
+                        tooltip.style.display = "block";
+                        const rectContainer = container.getBoundingClientRect();
+                        const x = event.clientX - rectContainer.left + 15;
+                        const y = event.clientY - rectContainer.top - 130;
+                        tooltip.style.left = x + "px";
+                        tooltip.style.top = y + "px";
+                    })
+                    .on("mouseleave", () => {
+                        tooltip.style.display = "none";
+                    });
+            }
+
+            node.each(function(d) {
+                const el = d3.select(this);
+                const hasConjoint = d.data.conjoint !== null;
+                const p1 = d.data.personne;
+                const p2 = d.data.conjoint;
+
+                const g1 = el.append("g")
+                    .attr("transform", hasConjoint ? "translate(-145, -25)" : "translate(-65, -25)");
+
+                g1.append("rect")
+                    .attr("width", 130)
+                    .attr("height", 50)
+                    .attr("fill", "#ffffff")
+                    .attr("stroke", "#cbd5e1")
+                    .attr("stroke-width", "2px")
+                    .attr("rx", "8px")
+                    .attr("ry", "8px")
+                    .style("cursor", "pointer")
+                    .on("click", () => { basculerVue(); chargerMembreDansFormulaire(p1.id); });
+
+                const avatar1 = g1.append("g").style("cursor", "pointer");
+                if (p1.photo) {
+                    avatar1.append("image").attr("xlink:href", p1.photo).attr("x", 8).attr("y", 7).attr("width", 36).attr("height", 36).attr("clip-path", "circle(18px at 18px 18px)");
+                } else {
+                    avatar1.append("text").attr("x", 15).attr("y", 30).style("font-size", "16px").text("👤");
+                }
+                gererEvenementsPhoto(avatar1, p1);
+
+                const txt1 = g1.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p1.id); });
+                txt1.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p1.prenom);
+                txt1.append("text").attr("x", 50).attr("y", 34).style("font-size", "9px").style("fill", "#64748b").text(p1.dateNaissance || "");
+
+                if (hasConjoint) {
+                    el.append("text").attr("x", 0).attr("y", 5).style("font-size", "16px").text("❤️").style("text-anchor", "middle");
+
+                    const g2 = el.append("g")
+                        .attr("transform", "translate(15, -25)");
+
+                    g2.append("rect")
+                        .attr("width", 130)
+                        .attr("height", 50)
+                        .attr("fill", "#ffffff")
+                        .attr("stroke", "#cbd5e1")
+                        .attr("stroke-width", "2px")
+                        .attr("rx", "8px")
+                        .attr("ry", "8px")
+                        .style("cursor", "pointer")
+                        .on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
+
+                    const avatar2 = g2.append("g").style("cursor", "pointer");
+                    if (p2.photo) {
+                        avatar2.append("image").attr("xlink:href", p2.photo).attr("x", 8).attr("y", 7).attr("width", 36).attr("height", 36).attr("clip-path", "circle(18px at 18px 18px)");
+                    } else {
+                        avatar2.append("text").attr("x", 15).attr("y", 30).style("font-size", "16px").text("👤");
+                    }
+                    gererEvenementsPhoto(avatar2, p2);
+
+                    const txt2 = g2.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
+                    txt2.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p2.prenom);
+                    txt2.append("text").attr("x", 50).attr("y", 34).style("font-size", "9px").style("fill", "#64748b").text(p2.dateNaissance || "");
+                }
+            });
+        }
+
+        function telechargerPoster() {
+            const svgElement = document.querySelector("#poster-container svg");
+            if (!svgElement) return;
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svgElement);
+            source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+            const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `arbre-genealogique-${famille.nomFamille.toLowerCase()}.svg`;
+            document.exitFullscreen ? document.exitFullscreen() : null;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = function() {
+            rafraichirInterfaceListe();
+        };
+    </script>
+</body>
+</html>

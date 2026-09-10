@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion et Arbre Généalogique - Accueil</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+        }
+
+        .actions-bar span {
+            font-weight: 600;
+            color: #475569;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-danger {
+            background-color: #ef4444;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .btn-secondary {
+            background-color: #64748b;
+        }
+        .btn-secondary:hover {
+            background-color: #475569;
+        }
+
+        /* Grille des familles */
+        .familles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .famille-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+
+        .famille-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59,130,246,0.1);
+            transform: translateY(-2px);
+        }
+
+        .famille-info h3 {
+            margin-top: 0;
+            color: #1e293b;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .famille-info p {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .card-actions button {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        .card-actions .btn-danger {
+            flex: 0 0 auto;
+        }
+
+        /* Modal de création */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border: 1px solid #cbd5e1;
+        }
+        .modal-content h3 { margin-top: 0; color: #1e293b; font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #475569; }
+        .form-group input { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Gestion et Arbre Généalogique</h1>
+        
+        <div class="actions-bar">
+            <span>Mes arbres généalogiques enregistrés</span>
+            <button onclick="ouvrirModalCreation()">➕ Créer une nouvelle famille</button>
+        </div>
+
+        <div id="familles-container" class="familles-grid">
+            <!-- Les cartes des familles s'afficheront ici dynamiquement -->
+        </div>
+    </div>
+
+    <!-- Modal Nouvelle Famille -->
+    <div id="modal-creation" class="modal">
+        <div class="modal-content">
+            <h3>Créer une nouvelle famille</h3>
+            <div class="form-group" style="margin-top: 15px;">
+                <label for="nom-famille-input">Nom de la famille</label>
+                <input type="text" id="nom-famille-input" placeholder="ex: Dupont">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="fermerModalCreation()">Annuler</button>
+                <button onclick="creerNouvelleFamille()">Créer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function chargerFamilles() {
+            const container = document.getElementById('familles-container');
+            container.innerHTML = '';
+
+            let famillesTrouvees = [];
+
+            const ancienneDonnee = localStorage.getItem('arbre_famille');
+            if (ancienneDonnee) {
+                famillesTrouvees.push({ cle: 'arbre_famille', nom: 'Palussiere' });
+            }
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const cle = localStorage.key(i);
+                if (cle.startsWith('arbre_famille_')) {
+                    const nomFamille = cle.replace('arbre_famille_', '');
+                    if (!famillesTrouvees.some(f => f.cle === cle)) {
+                        famillesTrouvees.push({ cle: cle, nom: nomFamille });
+                    }
+                }
+            }
+
+            if (famillesTrouvees.length === 0) {
+                famillesTrouvees.push({ cle: 'arbre_famille_palussiere', nom: 'Palussiere' });
+            }
+
+            famillesTrouvees.forEach(fam => {
+                let nbMembres = 0;
+                try {
+                    const rawData = localStorage.getItem(fam.cle);
+                    if (rawData) {
+                        const parsed = JSON.parse(rawData);
+                        if (parsed && Array.isArray(parsed.membres)) {
+                            nbMembres = parsed.membres.length;
+                        }
+                        if (parsed && parsed.nomFamille) {
+                            fam.nomAffichage = parsed.nomFamille;
+                        }
+                    }
+                } catch(e) {
+                    console.error("Erreur lecture", fam.cle, e);
+                }
+
+                const nomAffichage = fam.nomAffichage || fam.nom.charAt(0).toUpperCase() + fam.nom.slice(1);
+
+                const card = document.createElement('div');
+                card.className = 'famille-card';
+                card.innerHTML = `
+                    <div class="famille-info">
+                        <h3>Famille ${nomAffichage}</h3>
+                        <p>${nbMembres} membre${nbMembres > 1 ? 's' : ''} enregistré${nbMembres > 1 ? 's' : ''}</p>
+                    </div>
+                    <div class="card-actions">
+                        <button onclick="ouvrirFamille('${nomAffichage}')">Ouvrir l'arbre</button>
+                        <button class="btn-danger" onclick="supprimerFamille('${fam.cle}', '${nomAffichage}')" title="Supprimer cette famille">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function ouvrirFamille(nomFamille) {
+            window.location.href = `famille.html?nom=${encodeURIComponent(nomFamille)}`;
+        }
+
+        function ouvrirModalCreation() {
+            document.getElementById('nom-famille-input').value = '';
+            document.getElementById('modal-creation').style.display = 'flex';
+            document.getElementById('nom-famille-input').focus();
+        }
+
+        function fermerModalCreation() {
+            document.getElementById('modal-creation').style.display = 'none';
+        }
+
+        function creerNouvelleFamille() {
+            const nom = document.getElementById('nom-famille-input').value.trim();
+            if (!nom) {
+                alert("Veuillez entrer un nom de famille.");
+                return;
+            }
+            window.location.href = `famille.html?nom=${encodeURIComponent(nom)}`;
+        }
+
+        function supprimerFamille(cle, nom) {
+            if (confirm(`Voulez-vous vraiment supprimer définitivement la famille ${nom} et tous ses membres ?`)) {
+                localStorage.removeItem(cle);
+                if (cle === 'arbre_famille') localStorage.removeItem('arbre_famille');
+                chargerFamilles();
+            }
+        }
+
+        window.onload = function() {
+            chargerFamilles();
+        };
+    </script>
+</body>
+</html>
