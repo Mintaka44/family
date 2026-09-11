@@ -886,29 +886,9 @@
             svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
 
             // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
-            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
-            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
-            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
-            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
-            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
-
             const liensSecondaires = [];
 
             // 1. DESSIN DES LIENS PRINCIPAUX
-            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX ---
-
-            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX ---
-
-            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (100% GÉNÉRIQUE) ---
-
-            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (100% SÉCURISÉE CONTRE LES NaN) ---
-
-            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (GÉOMÉTRIQUE & ROBUSTE) ---
 
             g.selectAll("path.lien-principal")
                 .data(root.links())
@@ -921,19 +901,22 @@
                 .attr("d", d => {
                     if (d.source.data.personne === null) return "";
 
-                    const targetPerson = d.target.data.personne || d.target.data;
+                    const targetPerson = d.target.data.personne;
+                    const targetConjoint = d.target.data.conjoint;
+                    const targetEx = d.target.data.exConjoint;
                     const sourceNode = d.source;
                     
                     const ySource = sourceNode.y;
-                    const xCible = d.target.x;
                     const yCible = d.target.y;
                     const xNode = sourceNode.x;
+                    const xTargetNode = d.target.x;
 
-                    // IDs des parents de l'enfant
-                    const cp1 = String(targetPerson?.parent1Id || targetPerson?.p1Id || "");
-                    const cp2 = String(targetPerson?.parent2Id || targetPerson?.p2Id || "");
+                    // IDs des parents de l'enfant (dans la cible)
+                    const targetPersonPers = targetPerson || d.target.data;
+                    const cp1 = String(targetPersonPers?.parent1Id || targetPersonPers?.p1Id || "");
+                    const cp2 = String(targetPersonPers?.parent2Id || targetPersonPers?.p2Id || "");
 
-                    // IDs présents dans le nœud parent
+                    // IDs présents dans le nœud parent (source)
                     const p1Id = sourceNode.data.personne ? String(sourceNode.data.personne.id) : "";
                     const p2Id = sourceNode.data.conjoint ? String(sourceNode.data.conjoint.id) : "";
                     const exId = sourceNode.data.exConjoint ? String(sourceNode.data.exConjoint.id) : "";
@@ -949,48 +932,67 @@
                     const childHasP2 = isP2(cp1) || isP2(cp2);
                     const childHasEx = isEx(cp1) || isEx(cp2);
 
-                    // Calcul des décalages X relatifs au centre du nœud (xNode) selon la configuration
-                    let xOffset = 0;
+                    // 1. CALCUL DU DÉPART DU LIEN (Côté Parents)
+                    let xOffsetSource = 0;
 
                     if (hasEx && hasConjoint) {
-                        // Configuration actuelle (Ex à gauche, Mélissa au centre, Anthony à droite)
-                        // Centres des cartes : Ex = -150, Mélissa = +65, Anthony = +225
-                        const xEx = -150;
-                        const xP1 = 65;
-                        const xP2 = 225;
-
+                        const xEx = -150, xP1 = 65, xP2 = 225;
                         if (childHasEx && childHasP1 && !childHasP2) {
-                            xOffset = (xEx + xP1) / 2; // Milieu du trait pointillé (-42.5)
+                            xOffsetSource = (xEx + xP1) / 2;
                         } else if (childHasP1 && childHasP2) {
-                            xOffset = (xP1 + xP2) / 2; // Milieu du cœur (145)
+                            xOffsetSource = (xP1 + xP2) / 2;
                         } else if (childHasP2 && !childHasP1 && !childHasEx) {
-                            xOffset = xP2; // Pile sur la carte d'Anthony (225) -> C'est le cas d'Eliott !
+                            xOffsetSource = xP2;
                         } else if (childHasEx && !childHasP1 && !childHasP2) {
-                            xOffset = xEx; // Pile sur la carte de l'ex
+                            xOffsetSource = xEx;
                         } else {
-                            xOffset = xP1; // Par défaut sur Mélissa
+                            xOffsetSource = xP1;
                         }
-                    } 
-                    else if (hasEx && !hasConjoint) {
-                        // Ex à gauche, Personne principale à droite
-                        // Centres : Ex = -80, P1 = +80
-                        if (childHasEx && childHasP1) xOffset = 0; // Milieu
-                        else if (childHasEx) xOffset = -80;
-                        else xOffset = 80;
-                    } 
-                    else if (!hasEx && hasConjoint) {
-                        // Personne principale à gauche, Conjoint à droite
-                        // Centres : P1 = -80, Conjoint = +80
-                        if (childHasP1 && childHasP2) xOffset = 0; // Milieu (cœur)
-                        else if (childHasP2) xOffset = 80; // Sur le conjoint
-                        else xOffset = -80; // Sur P1
-                    } 
-                    else {
-                        // Parent unique sans conjoint ni ex
-                        xOffset = 0;
+                    } else if (hasEx && !hasConjoint) {
+                        if (childHasEx && childHasP1) xOffsetSource = 0;
+                        else if (childHasEx) xOffsetSource = -80;
+                        else xOffsetSource = 80;
+                    } else if (!hasEx && hasConjoint) {
+                        if (childHasP1 && childHasP2) xOffsetSource = 0;
+                        else if (childHasP2) xOffsetSource = 80;
+                        else xOffsetSource = -80;
                     }
 
-                    const xDepart = xNode + xOffset;
+                    const xDepart = xNode + xOffsetSource;
+
+                    // 2. CALCUL DE L'ARRIVÉE DU LIEN (Côté Enfant / Cible)
+                    const hasTargetConjoint = targetConjoint !== null && targetConjoint !== undefined;
+                    const hasTargetEx = targetEx !== null && targetEx !== undefined;
+
+                    const targetP1Id = targetPerson ? String(targetPerson.id) : "";
+                    const targetP2Id = targetConjoint ? String(targetConjoint.id) : "";
+                    const targetExId = targetEx ? String(targetEx.id) : "";
+
+                    const tP1Match = targetP1Id && (cp1 === targetP1Id || cp2 === targetP1Id);
+                    const tP2Match = targetP2Id && (cp1 === targetP2Id || cp2 === targetP2Id);
+                    const tExMatch = targetExId && (cp1 === targetExId || cp2 === targetExId);
+
+                    let xOffsetTarget = 0;
+
+                    if (hasTargetEx && hasTargetConjoint) {
+                        const xEx = -150, xP1 = 65, xP2 = 225;
+                        if (tExMatch) xOffsetTarget = xEx;
+                        else if (tP2Match) xOffsetTarget = xP2;
+                        else xOffsetTarget = xP1;
+                    } else if (hasTargetEx && !hasTargetConjoint) {
+                        const xEx = -80, xP1 = 80;
+                        if (tExMatch) xOffsetTarget = xEx;
+                        else xOffsetTarget = xP1;
+                    } else if (!hasTargetEx && hasTargetConjoint) {
+                        const xP1 = -80, xP2 = 80;
+                        // Si l'enfant appartient au conjoint (ex: Eliott avec Anthony)
+                        if (tP2Match && !tP1Match) xOffsetTarget = xP2;
+                        else xOffsetTarget = xP1; // Par défaut sur la personne principale (Mélissa)
+                    } else {
+                        xOffsetTarget = 0;
+                    }
+
+                    const xCible = xTargetNode + xOffsetTarget;
 
                     return `M ${xDepart} ${ySource} 
                             C ${xDepart} ${(ySource + yCible) / 2}, 
