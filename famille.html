@@ -1287,144 +1287,154 @@
 				calendrierParMois[moisIndex].push(m);
 			});
 
-			// Calcul de la hauteur totale dynamique du SVG
-			let totalHeight = 220; // Espace pour le bandeau supérieur
-			nomsMois.forEach((nomMois, indexMois) => {
-				if (calendrierParMois[indexMois] && calendrierParMois[indexMois].length > 0) {
-					totalHeight += 35; // Titre du mois
-					totalHeight += calendrierParMois[indexMois].length * 60; // Hauteur par carte membre + espacement
-					totalHeight += 20; // Marge entre les mois
-				}
-			});
-			if (membresSansDate.length > 0) {
-				totalHeight += 35;
-				totalHeight += membresSansDate.length * 60;
-				totalHeight += 20;
-			}
-			totalHeight = Math.max(totalHeight, 600);
+			// Construction d'un document HTML propre pour une impression PDF parfaite
+			let htmlContent = `
+			<!DOCTYPE html>
+			<html lang="fr">
+			<head>
+				<meta charset="UTF-8">
+				<title>Calendrier des Anniversaires - ${famille.nomFamille || 'Famille'}</title>
+				<style>
+					body {
+						font-family: 'Segoe UI', Tahoma, sans-serif;
+						background-color: #f8fafc;
+						color: #1e293b;
+						max-width: 800px;
+						margin: 0 auto;
+						padding: 20px;
+					}
+					.banner {
+						background: linear-gradient(135deg, #1e293b, #3b82f6);
+						color: white;
+						border-radius: 12px;
+						padding: 25px;
+						text-align: center;
+						margin-bottom: 30px;
+						box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+					}
+					.banner h1 { margin: 10px 0 5px 0; font-size: 22px; }
+					.banner p { margin: 0; color: #cbd5e1; font-size: 14px; }
+					
+					/* RÈGLE MAGIQUE POUR L'IMPRESSION : Empêche de couper un mois en deux */
+					.mois-bloc {
+						break-inside: avoid;
+						page-break-inside: avoid;
+						margin-bottom: 25px;
+					}
+					.mois-titre {
+						font-size: 16px;
+						font-weight: bold;
+						color: #1e293b;
+						margin-bottom: 10px;
+						display: flex;
+						align-items: center;
+						gap: 8px;
+					}
+					.mois-titre::before {
+						content: '';
+						display: inline-block;
+						width: 8px;
+						height: 8px;
+						background-color: #3b82f6;
+						border-radius: 50%;
+					}
+					.carte {
+						background: #ffffff;
+						border: 1px solid #e2e8f0;
+						border-radius: 8px;
+						padding: 12px 16px;
+						margin-bottom: 8px;
+						display: flex;
+						align-items: center;
+						gap: 15px;
+						box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+					}
+					.avatar {
+						width: 36px;
+						height: 36px;
+						border-radius: 50%;
+						background: #f1f5f9;
+						border: 1px solid #cbd5e1;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						font-size: 16px;
+						overflow: hidden;
+					}
+					.avatar img { width: 100%; height: 100%; object-fit: cover; }
+					.infos .nom { font-weight: bold; font-size: 13px; color: #0f172a; }
+					.infos .date { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-			const svgWidth = 800;
-
-			let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgWidth}" height="${totalHeight}" viewBox="0 0 ${svgWidth} ${totalHeight}">`;
-			
-			// --- DEFS (Dégradés et ombres) ---
-			svgContent += `
-				<defs>
-					<linearGradient id="header-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-						<stop offset="0%" stop-color="#1e293b" />
-						<stop offset="100%" stop-color="#3b82f6" />
-					</linearGradient>
-					<filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-						<feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.06"/>
-					</filter>
-				</defs>
+					@media print {
+						body { background: white; padding: 0; }
+						.banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+					}
+				</style>
+			</head>
+			<body>
+				<div class="banner">
+					<div style="font-size: 28px; margin-bottom: 5px;">📅</div>
+					<h1>CALENDRIER DES ANNIVERSAIRES</h1>
+					<p>Famille ${famille.nomFamille ? famille.nomFamille.toUpperCase() : ''}</p>
+				</div>
 			`;
 
-			// Fond général propre
-			svgContent += `<rect width="100%" height="100%" fill="#f8fafc"/>`;
-
-			// --- BANDEAU SUPÉRIEUR STYLE PAGE ---
-			const bannerWidth = svgWidth - 60;
-			svgContent += `
-				<g transform="translate(30, 25)">
-					<rect width="${bannerWidth}" height="140" fill="url(#header-grad)" rx="12" />
-					<circle cx="80" cy="70" r="60" fill="rgba(255,255,255,0.03)" />
-					<circle cx="${bannerWidth - 80}" cy="60" r="80" fill="rgba(255,255,255,0.03)" />
-					
-					<g transform="translate(${bannerWidth / 2 - 40}, 15)">
-						<circle cx="40" cy="35" r="26" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
-						<text x="40" y="43" font-size="22" text-anchor="middle">📅</text>
-					</g>
-					
-					<text x="${bannerWidth / 2}" y="95" font-family="'Segoe UI', Tahoma, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">CALENDRIER DES ANNIVERSAIRES</text>
-					<text x="${bannerWidth / 2}" y="118" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" fill="#cbd5e1" text-anchor="middle">Famille ${famille.nomFamille ? famille.nomFamille.toUpperCase() : ''}</text>
-				</g>
-			`;
-
-			let currentY = 195;
-
-			// --- BOUCLE DES MOIS ---
+			// Boucle des mois
 			nomsMois.forEach((nomMois, indexMois) => {
 				const membresDuMois = calendrierParMois[indexMois];
 				if (membresDuMois && membresDuMois.length > 0) {
-					// Titre du mois avec une petite puce décorative
-					svgContent += `<circle cx="42" cy="${currentY + 2}" r="4" fill="#3b82f6"/>`;
-					svgContent += `<text x="56" y="${currentY + 7}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">${nomMois}</text>`;
-					currentY += 28;
+					htmlContent += `<div class="mois-bloc">`;
+					htmlContent += `<div class="mois-titre">${nomMois}</div>`;
 
 					membresDuMois.forEach(m => {
 						const parts = m.dateNaissance.split('/');
 						const jour = parseInt(parts[0], 10);
-						const mois = parseInt(parts[1], 10) - 1;
-						const annee = parseInt(parts[2], 10);
-
-						const naissance = new Date(annee, mois, jour);
-						let age = aujourdhui.getFullYear() - naissance.getFullYear();
-						const diffMois = aujourdhui.getMonth() - naissance.getMonth();
-						if (diffMois < 0 || (diffMois === 0 && aujourdhui.getDate() < naissance.getDate())) {
-							age--;
-						}
-
-						const ageTexte = !isNaN(age) ? `• ${age} ans` : '';
-						const fullName = `${m.pressom || m.prenom || ''} ${m.nom ? m.nom.toUpperCase() : ''}`;
-
-						// Carte de membre (fond blanc + ombre)
-						svgContent += `<rect x="30" y="${currentY}" width="${svgWidth - 60}" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>`;
 						
-						// Avatar rond
-						svgContent += `<circle cx="58" cy="${currentY + 24}" r="18" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
-						if (m.photo) {
-							svgContent += `<image href="${m.photo}" x="40" y="${currentY + 6}" width="36" height="36" clip-path="circle(18px at 18px 18px)"/>`;
-						} else {
-							svgContent += `<text x="58" y="${currentY + 29}" font-family="sans-serif" font-size="15" text-anchor="middle">👤</text>`;
-						}
-
-						// Nom et Prénom
-						svgContent += `<text x="92" y="${currentY + 20}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</text>`;
-						
-						// Date
-						svgContent += `<text x="92" y="${currentY + 36}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Le ${jour} ${nomMois}</text>`;
-
-						currentY += 56;
+						htmlContent += `
+							<div class="carte">
+								<div class="avatar">
+									${m.photo ? `<img src="${m.photo}">` : '👤'}
+								</div>
+								<div class="infos">
+									<div class="nom">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</div>
+									<div class="date">Le ${jour} ${nomMois}</div>
+								</div>
+							</div>
+						`;
 					});
-					currentY += 15;
+					htmlContent += `</div>`;
 				}
 			});
 
-			// --- MEMBRES SANS DATE ---
+			// Membres sans date
 			if (membresSansDate.length > 0) {
-				svgContent += `<circle cx="42" cy="${currentY + 2}" r="4" fill="#94a3b8"/>`;
-				svgContent += `<text x="56" y="${currentY + 7}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">Date non définie</text>`;
-				currentY += 28;
-
+				htmlContent += `<div class="mois-bloc">`;
+				htmlContent += `<div class="mois-titre" style="color:#94a3b8;">Date non définie</div>`;
 				membresSansDate.forEach(m => {
-					svgContent += `<rect x="30" y="${currentY}" width="${svgWidth - 60}" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>`;
-					svgContent += `<circle cx="58" cy="${currentY + 24}" r="18" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>`;
-					if (m.photo) {
-						svgContent += `<image href="${m.photo}" x="40" y="${currentY + 6}" width="36" height="36" clip-path="circle(18px at 18px 18px)"/>`;
-					} else {
-						svgContent += `<text x="58" y="${currentY + 29}" font-family="sans-serif" font-size="15" text-anchor="middle">👤</text>`;
-					}
-
-					svgContent += `<text x="92" y="${currentY + 20}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</text>`;
-					svgContent += `<text x="92" y="${currentY + 36}" font-family="'Segoe UI', Tahoma, sans-serif" font-size="11" fill="#64748b">Date de naissance non renseignée</text>`;
-
-					currentY += 56;
+					htmlContent += `
+						<div class="carte">
+							<div class="avatar">${m.photo ? `<img src="${m.photo}">` : '👤'}</div>
+							<div class="infos">
+								<div class="nom">${m.prenom} ${m.nom ? m.nom.toUpperCase() : ''}</div>
+								<div class="date">Date de naissance non renseignée</div>
+							</div>
+						</div>
+					`;
 				});
+				htmlContent += `</div>`;
 			}
 
-			svgContent += `</svg>`;
+			htmlContent += `</body></html>`;
 
-			// Téléchargement du fichier SVG
-			const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+			// Ouverture dans un nouvel onglet pour impression directe en PDF sans coupure
+			const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
 			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `calendrier-anniversaires-${(famille.nomFamille || 'famille').toLowerCase()}.svg`;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
+			const win = window.open(url, '_blank');
+			if (win) {
+				win.onload = () => {
+					setTimeout(() => win.print(), 500);
+				};
+			}
 		}
     </script>
 	
