@@ -877,7 +877,6 @@
                         // Si les deux parents sont trouvés dans l'arbre, on calcule le milieu exact de leur trait pointillé
                         if (noeudP1 && noeudP2 && noeudP1 !== noeudP2) {
                             xDepart = ((noeudP1.x + noeudP2.x) / 2) - 40;
-							console.log(xDepart);
 
                             // On enregistre le trait pointillé horizontal entre ces deux ex si ce n'est pas déjà fait
                             const idA = noeudP1.data.personne?.id || noeudP1.data.id;
