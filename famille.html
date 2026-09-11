@@ -837,130 +837,98 @@
             
             svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
 
-            // NOUVEAU BLOC : Gestion des liens pour familles recomposées et enfants uniques
-            g.selectAll("path")
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
+            const liensSecondaires = [];
+
+            // 1. DESSIN DES LIENS PRINCIPAUX & DÉTECTION DES EX-CONJOINTS
+            g.selectAll("path.lien-principal")
                 .data(root.links())
                 .enter()
                 .append("path")
+                .attr("class", "lien-principal")
                 .attr("fill", "none")
                 .attr("stroke", d => d.source.data.personne === null ? "transparent" : "#64748b")
                 .attr("stroke-width", d => d.source.data.personne === null ? "0px" : "2px")
                 .attr("d", d => {
                     if (d.source.data.personne === null) return "";
 
-                    const enfant = d.target.data.personne;
-                    const p1Id = enfant.parent1Id;
-                    const p2Id = enfant.parent2Id;
-                    
-                    const p1 = d.source.data.personne;
-                    const p2 = d.source.data.conjoint;
-
-                    let xDepart = d.source.x; // Par défaut au centre (le cœur)
+                    const targetPerson = d.target.data.personne || d.target.data;
+                    let xDepart = d.source.x;
                     const yDepart = d.source.y;
                     const yCible = d.target.y;
-                    let xCible;
-                    if (d.target.data.conjoint) {
-                        // Si l'enfant est le premier membre du couple (à gauche), on décale vers la gauche
-                        // Si c'est l'autre, on décale vers la droite. 
-                        // En général, l'enfant principal est le premier, donc on soustrait la demi-largeur (ex: 65) :
-                        xCible = d.target.x - 65; 
+                    let xCible = d.target.data.conjoint ? d.target.x - 65 : d.target.x;
+
+                    const p1Id = targetPerson?.parent1Id || targetPerson?.p1Id;
+                    const p2Id = targetPerson?.parent2Id || targetPerson?.p2Id;
+
+                    // Si l'enfant a deux parents distincts (cas d'un ex-couple type Sabine & Pierre)
+                    if (p1Id && p2Id && p1Id != p2Id) {
+                        let noeudP1 = null;
+                        let noeudP2 = null;
+
+                        root.descendants().forEach(n => {
+                            const p = n.data.personne || n.data;
+                            const c = n.data.conjoint;
+                            if ((p && p.id == p1Id) || (c && c.id == p1Id)) noeudP1 = n;
+                            if ((p && p.id == p2Id) || (c && c.id == p2Id)) noeudP2 = n;
+                        });
+
+                        // Si les deux parents sont trouvés dans l'arbre, on calcule le milieu exact de leur trait pointillé
+                        if (noeudP1 && noeudP2 && noeudP1 !== noeudP2) {
+                            xDepart = ((noeudP1.x + noeudP2.x) / 2) - 40;
+							console.log(xDepart);
+
+                            // On enregistre le trait pointillé horizontal entre ces deux ex si ce n'est pas déjà fait
+                            const idA = noeudP1.data.personne?.id || noeudP1.data.id;
+                            const idB = noeudP2.data.personne?.id || noeudP2.data.id;
+                            const coupleKey = [idA, idB].sort().join('-');
+                            
+                            if (!liensSecondaires.some(l => l.coupleKey === coupleKey)) {
+                                liensSecondaires.push({
+                                    parentA: noeudP1,
+                                    parentB: noeudP2,
+                                    coupleKey: coupleKey
+                                });
+                            }
+                        }
                     } else {
-                        xCible = d.target.x;
+                        // Cas classique (couple normal)
+                        const p1 = d.source.data.personne || d.source.data;
+                        const p2 = d.source.data.conjoint;
+                        const estLieP1 = p1 && (p1Id == p1.id || p2Id == p1.id);
+                        const estLieP2 = p2 && (p1Id == p2.id || p2Id == p2.id);
+
+                        if (estLieP1 && !estLieP2) {
+                            xDepart = d.source.x - 65;
+                        } else if (estLieP2 && !estLieP1) {
+                            xDepart = d.source.x + 65;
+                        }
                     }
 
-                    // Vérifie quel membre du couple est réellement parent de cet enfant
-                    const estLieP1 = p1 && (p1Id === p1.id || p2Id === p1.id);
-                    const estLieP2 = p2 && (p1Id === p2.id || p2Id === p2.id);
 
-                    if (estLieP1 && !estLieP2) {
-                        // L'enfant est lié au parent de gauche (ex: Pierre) mais PAS au conjoint actuel (ex: Véronique)
-                        xDepart = d.source.x - 65; // Démarre directement de la carte de Pierre
-                    } else if (estLieP2 && !estLieP1) {
-                        // L'enfant est lié au conjoint de droite mais PAS au parent de gauche
-                        xDepart = d.source.x + 65; // Démarre directement de la carte de droite
-                    } else {
-                        // Enfant commun aux deux membres du couple (ou aucun des deux)
-                        xDepart = d.source.x;      // Démarre au milieu du couple (sur le cœur)
-                    }
-
-                    // Tracé de la courbe reliant le bon point de départ aux coordonnées de l'enfant
                     return `M ${xDepart} ${yDepart} 
                             C ${xDepart} ${(yDepart + yCible) / 2}, 
                               ${xCible} ${(yDepart + yCible) / 2}, 
                               ${xCible} ${yCible}`;
                 });
-				
-				// --- BLOC : Liens secondaires pour les parents ex-conjoints (ex: Sabine pour Mélissa) ---
-				const liensSecondaires = [];
-				
-				famille.membres.forEach(membre => {
-					// On vérifie les deux parents potentiels de chaque membre
-					[membre.parent1Id, membre.parent2Id].forEach(parentId => {
-						if (!parentId) return;
-						
-						// Recherche du nœud D3 de l'enfant et du nœud du parent dans l'arbre
-						const noeudEnfant = root.descendants().find(d => d.data.personne && d.data.personne.id === membre.id);
-						const noeudParent = root.descendants().find(d => {
-							if (d.data.personne && d.data.personne.id === parentId) return true;
-							if (d.data.conjoint && (d.data.personne.id === parentId || d.data.conjoint.id === parentId)) return true;
-							return false;
-						});
 
-						if (noeudEnfant && noeudParent) {
-							// On vérifie si ce lien n'est pas déjà le lien principal de l'arbre
-							const lienPrincipalExiste = root.links().some(l => 
-								l.target === noeudEnfant && l.source === noeudParent
-							);
-
-							if (!lienPrincipalExiste) {
-								liensSecondaires.push({
-									source: noeudParent,
-									target: noeudEnfant,
-									parentId: parentId
-								});
-							}
-						}
-					});
-				});
-
-				// Dessin des traits secondaires en "tronc commun" (ex: Sabine se connecte à la ligne de Pierre)
-				// Dessin des traits secondaires en "tronc commun" connectés à la ligne du parent principal
-				g.selectAll("path.lien-secondaire")
-					.data(liensSecondaires)
-					.enter()
-					.append("path")
-					.attr("class", "lien-secondaire")
-					.attr("fill", "none")
-					.attr("stroke", "#64748b")
-					.attr("stroke-width", "1.5px")
-					.attr("stroke-dasharray", "3,3") // Pointillés pour l'union passée
-					.attr("d", d => {
-						// 1. Point de départ : Sabine (le parent ex-conjoint)
-						let xDepart = d.source.x;
-						if (d.source.data.conjoint) {
-							if (d.source.data.personne.id === d.parentId) {
-								xDepart = d.source.x - 65;
-							} else {
-								xDepart = d.source.x + 65;
-							}
-						}
-						const yDepart = d.source.y;
-
-						// 2. On cherche le lien principal de cet enfant pour trouver la position exacte de la ligne de Pierre
-						const lienPrincipal = root.links().find(l => l.target === d.target);
-						
-						if (!lienPrincipal) return ""; // Sécurité si le lien principal n'est pas trouvé
-
-						// Position de l'axe vertical de Pierre (qui est à gauche dans le couple Pierre/Véronique)
-						const xPierre = lienPrincipal.source.x - 65; 
-						// Hauteur du point de jonction sur la ligne verticale descendante
-						const yJointure = lienPrincipal.source.y + 35; 
-
-						// 3. Tracé orthogonal : part de Sabine, va horizontalement jusqu'à l'axe de Pierre, puis descend
-						return `M ${xDepart} ${yDepart} 
-								H ${xPierre} 
-								V ${yJointure}`;
-					});
+            // 2. DESSIN DES LIENS SECONDAIRES (Traits pointillés horizontaux entre ex-conjoints)
+            g.selectAll("path.lien-secondaire")
+                .data(liensSecondaires)
+                .enter()
+                .append("path")
+                .attr("class", "lien-secondaire")
+                .attr("fill", "none")
+                .attr("stroke", "#64748b")
+                .attr("stroke-width", "1.5px")
+                .attr("stroke-dasharray", "3,3")
+                .attr("d", d => {
+                    const xA = d.parentA.x;
+                    const xB = d.parentB.x;
+                    const yA = d.parentA.y;
+                    return `M ${xA} ${yA} H ${xB}`;
+                });
 
             const node = g.selectAll(".node")
                 .data(root.descendants().filter(d => d.data.personne !== null && d.data.personne.id))
