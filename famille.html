@@ -680,10 +680,27 @@
                     }
                 }
 
-                // Récupération de tous les enfants liés au parent ou au couple
+                // Recherche d'un ex-conjoint (partage un enfant avec p mais pas de conjointId actif)
+                let exConjointObj = null;
+                const enfantAvecEx = famille.membres.find(m => 
+                    (m.parent1Id === p.id || m.parent2Id === p.id) &&
+                    ((m.parent1Id && m.parent1Id !== p.id && (!conjointObj || m.parent1Id !== conjointObj.id)) ||
+                     (m.parent2Id && m.parent2Id !== p.id && (!conjointObj || m.parent2Id !== conjointObj.id)))
+                );
+                if (enfantAvecEx) {
+                    const autreId = (enfantAvecEx.parent1Id === p.id) ? enfantAvecEx.parent2Id : enfantAvecEx.parent1Id;
+                    const ex = famille.membres.find(x => x.id === autreId);
+                    if (ex && !traiteSet.has(ex.id)) {
+                        traiteSet.add(ex.id);
+                        exConjointObj = ex;
+                    }
+                }
+
+                // Récupération de tous les enfants liés
                 const allEnfants = famille.membres.filter(m => 
                     m.parent1Id === p.id || m.parent2Id === p.id || 
-                    (conjointObj && (m.parent1Id === conjointObj.id || m.parent2Id === conjointObj.id))
+                    (conjointObj && (m.parent1Id === conjointObj.id || m.parent2Id === conjointObj.id)) ||
+                    (exConjointObj && (m.parent1Id === exConjointObj.id || m.parent2Id === exConjointObj.id))
                 );
 
                 function parseDate(str) {
@@ -693,44 +710,75 @@
                     return new Date(parts[2], parts[1] - 1, parts[0]);
                 }
 
-                let enfantsP1Seul = [];
-                let enfantsCommuns = [];
-                let enfantsP2Seul = [];
+                // --- TRI SUR MESURE DES ENFANTS ---
+                const p1Id = p ? String(p.id) : null;
+                const p2Id = conjointObj ? String(conjointObj.id) : null;
+                const exId = exConjointObj ? String(exConjointObj.id) : null;
 
-                allEnfants.forEach(e => {
-                    const estLieP1 = (e.parent1Id === p.id || e.parent2Id === p.id);
-                    const estLieP2 = conjointObj && (e.parent1Id === conjointObj.id || e.parent2Id === conjointObj.id);
+                allEnfants.sort((a, b) => {
+                    const getScore = (child) => {
+                        const cp1 = String(child.parent1Id || child.p1Id || "");
+                        const cp2 = String(child.parent2Id || child.p2Id || "");
 
-                    if (estLieP1 && estLieP2) {
-                        enfantsCommuns.push(e);
-                    } else if (estLieP1) {
-                        enfantsP1Seul.push(e);
-                    } else if (estLieP2) {
-                        enfantsP2Seul.push(e);
+                        // 1. Enfants exclusifs du parent 1 ou de l'ex (à gauche)
+                        const isP1Only = p1Id && (cp1 === p1Id || cp2 === p1Id) && (!p2Id || (cp1 !== p2Id && cp2 !== p2Id)) && (!exId || (cp1 !== exId && cp2 !== exId));
+                        const isExOnly = exId && (cp1 === exId || cp2 === exId) && (!p1Id || (cp1 !== p1Id && cp2 !== p1Id));
+                        if (isP1Only || isExOnly) return 1;
+
+                        // 2. Enfants en commun du couple actuel
+                        const isCommon = (p1Id && p2Id && ((cp1 === p1Id && cp2 === p2Id) || (cp1 === p2Id && cp2 === p1Id))) ||
+                                         (exId && p1Id && ((cp1 === exId && cp2 === p1Id) || (cp1 === p1Id && cp2 === exId)));
+                        if (isCommon) return 2;
+
+                        // 3. Enfants exclusifs du conjoint actuel / parent 2 (à droite, comme Eliott)
+                        const isP2Only = p2Id && (cp1 === p2Id || cp2 === p2Id) && (!p1Id || (cp1 !== p1Id && cp2 !== p1Id));
+                        if (isP2Only) return 3;
+
+                        return 2;
+                    };
+
+                    const scoreA = getScore(a);
+                    const scoreB = getScore(b);
+
+                    // Si les enfants appartiennent à la même catégorie, on trie par date de naissance
+                    if (scoreA === scoreB) {
+                        return parseDate(a.dateNaissance) - parseDate(b.dateNaissance);
                     }
+
+                    return scoreA - scoreB;
                 });
-
-                // Tri individuel de chaque groupe par date de naissance
-                enfantsP1Seul.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
-                enfantsCommuns.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
-                enfantsP2Seul.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
-
-                // Fusion finale dans l'ordre souhaité pour éviter les croisements
-                const enfantsData = [...enfantsP1Seul, ...enfantsCommuns, ...enfantsP2Seul];
 
                 return {
                     personne: p,
                     conjoint: conjointObj,
-                    children: enfantsData.map(e => construireNoeudHierarchique(e.id)).filter(Boolean)
+                    exConjoint: exConjointObj,
+                    children: allEnfants.map(e => construireNoeudHierarchique(e.id)).filter(Boolean)
                 };
             }
 
             let rootData = { personne: null, children: [] };
 
-            const racines = famille.membres.filter(m => !m.parent1Id && !m.parent2Id);
-            racines.forEach(r => {
-                const noeud = construireNoeudHierarchique(r.id);
-                if (noeud) rootData.children.push(noeud);
+            // --- MODIFICATION : Exclure des racines les ex-conjoints qui ont des enfants avec quelqu'un d'autre ---
+            const racines = famille.membres.filter(m => {
+                if (m.parent1Id || m.parent2Id) return false; // S'il a des parents, ce n'est pas une racine
+
+                // Est-ce que ce membre a des enfants en commun avec quelqu'un ?
+                const aDesEnfantsCommuns = famille.membres.some(enfant => 
+                    (enfant.parent1Id === m.id && enfant.parent2Id) || 
+                    (enfant.parent2Id === m.id && enfant.parent1Id)
+                );
+
+                // Si c'est un ex (il a des enfants avec un autre parent), on ne le met PAS en racine isolée, 
+                // il sera géré au sein de la branche de son/ses ex-partenaires.
+                if (aDesEnfantsCommuns) {
+                    // Sauf exception si c'est la racine principale absolue (comme Sabine/Pierre si on veut), 
+                    // mais pour Antho, cela va l'empêcher de flotter tout seul en haut.
+                    // On vérifie s'il est déjà le conjoint actuel de quelqu'un d'autre traité en haut
+                    const estConjointActuel = famille.membres.some(autrui => autrui.conjointId === m.id);
+                    return estConjointActuel; 
+                }
+
+                return true;
             });
 
             famille.membres.forEach(m => {
@@ -740,28 +788,28 @@
                 }
             });
 
-            // --- ASTUCE : Réordonner les racines pour rapprocher les ex-conjoints (ex: Sabine à côté de Pierre) ---
+            // --- ASTUCE DYNAMIQUE : Rapprocher automatiquement tous les ex-conjoints qui partagent des enfants ---
             rootData.children.sort((a, b) => {
-                // Vérifie si l'un des enfants de 'a' ou 'b' partage un parent dans l'autre branche
-                const aUnEnfantCommunAvec = (noeudRacine, autreNom) => {
-                    let trouve = false;
-                    function check(n) {
-                        if (!n.personne) return;
-                        const p1 = n.personne.parent1Id;
-                        const p2 = n.personne.parent2Id;
-                        if ((p1 && famille.membres.find(x => x.id === p1)?.prenom === autreNom) ||
-                            (p2 && famille.membres.find(x => x.id === p2)?.prenom === autreNom)) {
-                            trouve = true;
-                        }
-                        if (n.children) n.children.forEach(check);
-                    }
-                    if (noeudRacine.children) noeudRacine.children.forEach(check);
-                    return trouve;
+                if (!a.personne || !b.personne) return 0;
+                
+                const pA = a.personne;
+                const pB = b.personne;
+
+                // Fonction pour voir si deux personnes ont un enfant en commun
+                const ontUnEnfantEnCommun = (pers1, pers2) => {
+                    return famille.membres.some(m => 
+                        (m.parent1Id === pers1.id && m.parent2Id === pers2.id) ||
+                        (m.parent1Id === pers2.id && m.parent2Id === pers1.id)
+                    );
                 };
 
-                // Si Sabine (ou un autre ex) est liée à Pierre, on la place juste avant Pierre
-                if (a.personne && a.personne.prenom === "Sabine" && b.personne && b.personne.prenom === "Pierre") return -1;
-                if (b.personne && b.personne.prenom === "Sabine" && a.personne && a.personne.prenom === "Pierre") return 1;
+                // Si b est un ex-conjoint de a (ils partagent un enfant mais ne sont pas mariés/conjoints actuels)
+                if (ontUnEnfantEnCommun(pA, pB)) {
+                    // Si b n'est pas le conjoint actuel de a, on les colle
+                    if (pA.conjointId !== pB.id && pB.conjointId !== pA.id) {
+                        return -1; // Place b juste après a
+                    }
+                }
                 return 0;
             });
 
@@ -839,9 +887,29 @@
 
             // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
 
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
+            // --- GESTION UNIFIÉE DES LIENS (PRINCIPAUX & SECONDAIRES) ---
+
             const liensSecondaires = [];
 
-            // 1. DESSIN DES LIENS PRINCIPAUX & DÉTECTION DES EX-CONJOINTS
+            // 1. DESSIN DES LIENS PRINCIPAUX
+            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX ---
+
+            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX ---
+
+            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (100% GÉNÉRIQUE) ---
+
+            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (100% SÉCURISÉE CONTRE LES NaN) ---
+
+            // --- GESTION UNIFIÉE DES LIENS PRINCIPAUX (GÉOMÉTRIQUE & ROBUSTE) ---
+
             g.selectAll("path.lien-principal")
                 .data(root.links())
                 .enter()
@@ -854,61 +922,79 @@
                     if (d.source.data.personne === null) return "";
 
                     const targetPerson = d.target.data.personne || d.target.data;
-                    let xDepart = d.source.x;
-                    const yDepart = d.source.y;
+                    const sourceNode = d.source;
+                    
+                    const ySource = sourceNode.y;
+                    const xCible = d.target.x;
                     const yCible = d.target.y;
-                    let xCible = d.target.data.conjoint ? d.target.x - 65 : d.target.x;
+                    const xNode = sourceNode.x;
 
-                    const p1Id = targetPerson?.parent1Id || targetPerson?.p1Id;
-                    const p2Id = targetPerson?.parent2Id || targetPerson?.p2Id;
+                    // IDs des parents de l'enfant
+                    const cp1 = String(targetPerson?.parent1Id || targetPerson?.p1Id || "");
+                    const cp2 = String(targetPerson?.parent2Id || targetPerson?.p2Id || "");
 
-                    // Si l'enfant a deux parents distincts (cas d'un ex-couple type Sabine & Pierre)
-                    if (p1Id && p2Id && p1Id != p2Id) {
-                        let noeudP1 = null;
-                        let noeudP2 = null;
+                    // IDs présents dans le nœud parent
+                    const p1Id = sourceNode.data.personne ? String(sourceNode.data.personne.id) : "";
+                    const p2Id = sourceNode.data.conjoint ? String(sourceNode.data.conjoint.id) : "";
+                    const exId = sourceNode.data.exConjoint ? String(sourceNode.data.exConjoint.id) : "";
 
-                        root.descendants().forEach(n => {
-                            const p = n.data.personne || n.data;
-                            const c = n.data.conjoint;
-                            if ((p && p.id == p1Id) || (c && c.id == p1Id)) noeudP1 = n;
-                            if ((p && p.id == p2Id) || (c && c.id == p2Id)) noeudP2 = n;
-                        });
+                    const hasEx = exId !== "";
+                    const hasConjoint = p2Id !== "";
 
-                        // Si les deux parents sont trouvés dans l'arbre, on calcule le milieu exact de leur trait pointillé
-                        if (noeudP1 && noeudP2 && noeudP1 !== noeudP2) {
-                            xDepart = ((noeudP1.x + noeudP2.x) / 2) - 40;
+                    const isP1 = (id) => id === p1Id;
+                    const isP2 = (id) => id === p2Id;
+                    const isEx = (id) => id === exId;
 
-                            // On enregistre le trait pointillé horizontal entre ces deux ex si ce n'est pas déjà fait
-                            const idA = noeudP1.data.personne?.id || noeudP1.data.id;
-                            const idB = noeudP2.data.personne?.id || noeudP2.data.id;
-                            const coupleKey = [idA, idB].sort().join('-');
-                            
-                            if (!liensSecondaires.some(l => l.coupleKey === coupleKey)) {
-                                liensSecondaires.push({
-                                    parentA: noeudP1,
-                                    parentB: noeudP2,
-                                    coupleKey: coupleKey
-                                });
-                            }
+                    const childHasP1 = isP1(cp1) || isP1(cp2);
+                    const childHasP2 = isP2(cp1) || isP2(cp2);
+                    const childHasEx = isEx(cp1) || isEx(cp2);
+
+                    // Calcul des décalages X relatifs au centre du nœud (xNode) selon la configuration
+                    let xOffset = 0;
+
+                    if (hasEx && hasConjoint) {
+                        // Configuration actuelle (Ex à gauche, Mélissa au centre, Anthony à droite)
+                        // Centres des cartes : Ex = -150, Mélissa = +65, Anthony = +225
+                        const xEx = -150;
+                        const xP1 = 65;
+                        const xP2 = 225;
+
+                        if (childHasEx && childHasP1 && !childHasP2) {
+                            xOffset = (xEx + xP1) / 2; // Milieu du trait pointillé (-42.5)
+                        } else if (childHasP1 && childHasP2) {
+                            xOffset = (xP1 + xP2) / 2; // Milieu du cœur (145)
+                        } else if (childHasP2 && !childHasP1 && !childHasEx) {
+                            xOffset = xP2; // Pile sur la carte d'Anthony (225) -> C'est le cas d'Eliott !
+                        } else if (childHasEx && !childHasP1 && !childHasP2) {
+                            xOffset = xEx; // Pile sur la carte de l'ex
+                        } else {
+                            xOffset = xP1; // Par défaut sur Mélissa
                         }
-                    } else {
-                        // Cas classique (couple normal)
-                        const p1 = d.source.data.personne || d.source.data;
-                        const p2 = d.source.data.conjoint;
-                        const estLieP1 = p1 && (p1Id == p1.id || p2Id == p1.id);
-                        const estLieP2 = p2 && (p1Id == p2.id || p2Id == p2.id);
-
-                        if (estLieP1 && !estLieP2) {
-                            xDepart = d.source.x - 65;
-                        } else if (estLieP2 && !estLieP1) {
-                            xDepart = d.source.x + 65;
-                        }
+                    } 
+                    else if (hasEx && !hasConjoint) {
+                        // Ex à gauche, Personne principale à droite
+                        // Centres : Ex = -80, P1 = +80
+                        if (childHasEx && childHasP1) xOffset = 0; // Milieu
+                        else if (childHasEx) xOffset = -80;
+                        else xOffset = 80;
+                    } 
+                    else if (!hasEx && hasConjoint) {
+                        // Personne principale à gauche, Conjoint à droite
+                        // Centres : P1 = -80, Conjoint = +80
+                        if (childHasP1 && childHasP2) xOffset = 0; // Milieu (cœur)
+                        else if (childHasP2) xOffset = 80; // Sur le conjoint
+                        else xOffset = -80; // Sur P1
+                    } 
+                    else {
+                        // Parent unique sans conjoint ni ex
+                        xOffset = 0;
                     }
 
+                    const xDepart = xNode + xOffset;
 
-                    return `M ${xDepart} ${yDepart} 
-                            C ${xDepart} ${(yDepart + yCible) / 2}, 
-                              ${xCible} ${(yDepart + yCible) / 2}, 
+                    return `M ${xDepart} ${ySource} 
+                            C ${xDepart} ${(ySource + yCible) / 2}, 
+                              ${xCible} ${(ySource + yCible) / 2}, 
                               ${xCible} ${yCible}`;
                 });
 
@@ -956,24 +1042,58 @@
 
             node.each(function(d) {
                 const el = d3.select(this);
-                const hasConjoint = d.data.conjoint !== null;
                 const p1 = d.data.personne;
                 const p2 = d.data.conjoint;
+                const ex = d.data.exConjoint;
 
-                const g1 = el.append("g")
-                    .attr("transform", hasConjoint ? "translate(-145, -25)" : "translate(-65, -25)");
+                const hasConjoint = p2 !== null && p2 !== undefined;
+                const hasEx = ex !== null && ex !== undefined;
 
-                g1.append("rect")
-                    .attr("width", 130)
-                    .attr("height", 50)
-                    .attr("fill", "#ffffff")
-                    .attr("stroke", "#cbd5e1")
-                    .attr("stroke-width", "2px")
-                    .attr("rx", "8px")
-                    .attr("ry", "8px")
-                    .style("cursor", "pointer")
-                    .on("click", () => { basculerVue(); chargerMembreDansFormulaire(p1.id); });
+                // Initialisation de la map des coordonnées X des cartes de ce nœud
+                d.data.xMap = {};
 
+                let startX = -65;
+                if (hasEx && hasConjoint) startX = -215;
+                else if (hasConjoint || hasEx) startX = -145;
+
+                let currentX = startX;
+
+                // 1. EX-CONJOINT (à gauche)
+                if (hasEx) {
+                    const gEx = el.append("g").attr("transform", `translate(${currentX}, -25)`);
+                    gEx.append("rect").attr("width", 130).attr("height", 50).attr("fill", "#ffffff").attr("stroke", "#cbd5e1").attr("stroke-width", "2px").attr("rx", "8px").attr("ry", "8px").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(ex.id); });
+                    
+                    const avatarEx = gEx.append("g").style("cursor", "pointer");
+                    if (ex.photo) {
+                        avatarEx.append("image").attr("xlink:href", ex.photo).attr("x", 8).attr("y", 7).attr("width", 36).attr("height", 36).attr("clip-path", "circle(18px at 18px 18px)");
+                    } else {
+                        avatarEx.append("text").attr("x", 15).attr("y", 30).style("font-size", "16px").text("👤");
+                    }
+                    gererEvenementsPhoto(avatarEx, ex);
+
+                    const txtEx = gEx.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(ex.id); });
+                    txtEx.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(ex.prenom);
+                    txtEx.append("text").attr("x", 50).attr("y", 34).style("font-size", "8.5px").style("fill", "#64748b").text(formaterDateAvecAge(ex.dateNaissance));
+
+                    // Enregistrer le centre absolu de la carte de l'ex
+                    d.data.xMap[ex.id] = d.x + currentX + 65;
+
+                    // Ligne pointillée
+                    el.append("path")
+                      .attr("d", `M ${currentX + 130} 0 H ${currentX + 215}`)
+                      .attr("stroke", "#64748b")
+                      .attr("stroke-width", "1.5px")
+                      .attr("stroke-dasharray", "3,3");
+
+                    currentX += 215;
+                } else if (hasConjoint) {
+                    currentX = -145;
+                }
+
+                // 2. PERSONNE PRINCIPALE (au centre)
+                const g1 = el.append("g").attr("transform", `translate(${currentX}, -25)`);
+                g1.append("rect").attr("width", 130).attr("height", 50).attr("fill", "#ffffff").attr("stroke", "#cbd5e1").attr("stroke-width", "2px").attr("rx", "8px").attr("ry", "8px").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p1.id); });
+                
                 const avatar1 = g1.append("g").style("cursor", "pointer");
                 if (p1.photo) {
                     avatar1.append("image").attr("xlink:href", p1.photo).attr("x", 8).attr("y", 7).attr("width", 36).attr("height", 36).attr("clip-path", "circle(18px at 18px 18px)");
@@ -986,22 +1106,17 @@
                 txt1.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p1.prenom);
                 txt1.append("text").attr("x", 50).attr("y", 34).style("font-size", "8.5px").style("fill", "#64748b").text(formaterDateAvecAge(p1.dateNaissance));
 
+                // Enregistrer le centre absolu de la personne principale
+                d.data.xMap[p1.id] = d.x + currentX + 65;
+
+                currentX += 130;
+
+                // 3. CONJOINT ACTUEL (à droite avec un cœur)
                 if (hasConjoint) {
-                    el.append("text").attr("x", 0).attr("y", 5).style("font-size", "16px").text("❤️").style("text-anchor", "middle");
+                    el.append("text").attr("x", currentX + 15).attr("y", 5).style("font-size", "16px").text("❤️").style("text-anchor", "middle");
 
-                    const g2 = el.append("g")
-                        .attr("transform", "translate(15, -25)");
-
-                    g2.append("rect")
-                        .attr("width", 130)
-                        .attr("height", 50)
-                        .attr("fill", "#ffffff")
-                        .attr("stroke", "#cbd5e1")
-                        .attr("stroke-width", "2px")
-                        .attr("rx", "8px")
-                        .attr("ry", "8px")
-                        .style("cursor", "pointer")
-                        .on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
+                    const g2 = el.append("g").attr("transform", `translate(${currentX + 30}, -25)`);
+                    g2.append("rect").attr("width", 130).attr("height", 50).attr("fill", "#ffffff").attr("stroke", "#cbd5e1").attr("stroke-width", "2px").attr("rx", "8px").attr("ry", "8px").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
 
                     const avatar2 = g2.append("g").style("cursor", "pointer");
                     if (p2.photo) {
@@ -1014,6 +1129,9 @@
                     const txt2 = g2.append("g").style("cursor", "pointer").on("click", () => { basculerVue(); chargerMembreDansFormulaire(p2.id); });
                     txt2.append("text").attr("x", 50).attr("y", 20).style("font-size", "11px").style("font-weight", "bold").style("fill", "#0f172a").text(p2.prenom);
                     txt2.append("text").attr("x", 50).attr("y", 34).style("font-size", "8.5px").style("fill", "#64748b").text(formaterDateAvecAge(p2.dateNaissance));
+
+                    // Enregistrer le centre absolu du conjoint actuel
+                    d.data.xMap[p2.id] = d.x + currentX + 30 + 65;
                 }
             });
         }
