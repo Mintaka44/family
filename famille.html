@@ -254,6 +254,7 @@
 			<div class="actions-left" style="width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
 				<button id="btn-toggle-vue" class="btn-action" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
 				<button class="btn-action" onclick="ouvrirCalendrierAnniversaires()">📅 Calendrier Anniversaires</button>
+				<button class="btn-action" onclick="modifierNomFamille()">✏️ Modifier le nom</button>
 			</div>
 			<div class="actions-right"></div>
 		</div>
@@ -337,6 +338,20 @@
     </div>
 
     <script>
+		function modifierNomFamille() {
+				const nouveauNom = prompt("Entrez le nouveau nom de la famille :", famille.nomFamille || "");
+				if (nouveauNom && nouveauNom.trim() !== "") {
+					famille.nomFamille = nouveauNom.trim();
+					sauvegarderStockage();
+					afficherBandeauFamille();
+					if (modeVueActuelle === 'graphique') {
+						genererPosterD3Vertical();
+					} else {
+						rafraichirInterfaceListe();
+					}
+				}
+			}
+	
 		function exporterJSON() {
 			const donnees = localStorage.getItem(storageKey);
 			if (!donnees) {
