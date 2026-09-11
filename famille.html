@@ -804,9 +804,32 @@
             const root = d3.hierarchy(rootData);
             treeLayout(root);
 
-            const initialScale = 0.75;
-            const initialX = (width - (width - 300)) / 2 + 50;
-            const initialY = 60;
+            // Calcul des limites exactes en incluant la largeur réelle des cartes
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            
+            root.descendants().forEach(d => {
+                const hasConjoint = d.data.conjoint !== null;
+                const margin = hasConjoint ? 145 : 65; // Largeur exacte du débordement de la carte
+                
+                if (d.x - margin < minX) minX = d.x - margin;
+                if (d.x + margin > maxX) maxX = d.x + margin;
+                if (d.y < minY) minY = d.y;
+                if (d.y > maxY) maxY = d.y;
+            });
+
+            window._treeBBox = { minX, maxX, minY, maxY };
+
+            const treeWidth = maxX - minX + 200;
+            const treeHeight = maxY - minY + 100;
+
+            const initialScale = Math.min(0.85, (width - 150) / treeWidth); 
+            const initialX = (width - (minX + maxX) * initialScale) / 2;
+            const initialY = 90 - minY * initialScale;
+
+            svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
+			
+			
             
             svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
 
@@ -1028,9 +1051,14 @@
 			const svgElement = document.querySelector("#poster-container svg");
 			if (!svgElement) return;
 
+			// Récupération du groupe principal de l'arbre et de sa taille
+			const mainGroup = svgElement.querySelector("svg > g");
+			if (!mainGroup) return;
+			const bbox = mainGroup.getBBox();
+
 			const origWidth = 1600;
 			const origHeight = 900;
-			const extraHeight = 200;
+			const extraHeight = 250;
 			const newHeight = origHeight + extraHeight;
 
 			// Cloner le SVG affiché à l'écran
@@ -1046,10 +1074,24 @@
 				bgRect.setAttribute("fill", "#ffffff");
 			}
 
-			// 2. Décaler tout l'arbre généalogique vers le bas pour laisser la place au bandeau
-			const groups = clonedSvg.querySelectorAll("svg > g");
-			if (groups.length > 0) {
-				groups[0].setAttribute("transform", `translate(0, ${extraHeight})`);
+			// 2. Positionnement, centrage et zoom optimisés
+			const clonedGroups = clonedSvg.querySelectorAll("svg > g");
+			if (clonedGroups.length > 0 && bbox.width > 0) {
+				const targetWidth = 1600;
+				const availableWidth = targetWidth - 200;
+
+				// Échelle de zoom (ajustez ce multiplicateur si vous voulez encore plus grand/petit, ex: 2.5 ou 3)
+				let scale = (availableWidth / bbox.width) * 2.5; 
+				if (scale > 2.2) scale = 2.2;
+
+				// Centrage horizontal parfait (milieu du poster = 800px)
+				const translateX = (targetWidth / 2) - (bbox.x + bbox.width / 2) * scale;
+
+				// Positionnement vertical direct fixé juste sous le bandeau (à y = 200)
+				// On retire la soustraction de bbox.y qui envoyait l'arbre tout en bas
+				const translateY = 200;
+
+				clonedGroups[0].setAttribute("transform", `translate(${translateX}, ${translateY}) scale(${scale})`);
 			}
 
 			// 3. Créer le groupe du bandeau avec les bonnes dimensions
