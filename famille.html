@@ -254,6 +254,7 @@
 			<div class="actions-left" style="width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
 				<button id="btn-toggle-vue" class="btn-action" onclick="basculerVue()">✨ Afficher le Poster Vertical</button>
 				<button class="btn-action" onclick="ouvrirCalendrierAnniversaires()">📅 Calendrier Anniversaires</button>
+				<button class="btn-action" onclick="modifierNomFamille()">✏️ Modifier le nom</button>
 			</div>
 			<div class="actions-right"></div>
 		</div>
@@ -337,7 +338,38 @@
     </div>
 
     <script>
+		function modifierNomFamille() {
+			const nouveauNom = prompt("Entrez le nouveau nom de la famille :", famille.nomFamille || "");
+			if (nouveauNom && nouveauNom.trim() !== "") {
+				const ancienStorageKey = storageKey;
+				
+				// Mettre à jour le nom et la clé de stockage
+				famille.nomFamille = nouveauNom.trim();
+				storageKey = `arbre_famille_${famille.nomFamille.toLowerCase()}`;
+				
+				// Sauvegarder sous la nouvelle clé
+				sauvegarderStockage();
+				
+				// Supprimer l'ancienne clé du localStorage si elle est différente pour éviter les doublons
+				if (ancienStorageKey !== storageKey) {
+					localStorage.removeItem(ancienStorageKey);
+					
+					// Mettre à jour l'URL du navigateur sans recharger la page
+					const newUrl = new URL(window.location);
+					newUrl.searchParams.set('nom', famille.nomFamille);
+					window.history.pushState({}, '', newUrl);
+				}
 
+				// Rafraîchir l'affichage
+				afficherBandeauFamille();
+				if (modeVueActuelle === 'graphique') {
+					genererPosterD3Vertical();
+				} else {
+					rafraichirInterfaceListe();
+				}
+			}
+		}
+	
 		function exporterJSON() {
 			const donnees = localStorage.getItem(storageKey);
 			if (!donnees) {
@@ -644,18 +676,43 @@
                     }
                 }
 
-                const enfantsData = famille.membres.filter(m => 
+                // Récupération de tous les enfants liés au parent ou au couple
+                const allEnfants = famille.membres.filter(m => 
                     m.parent1Id === p.id || m.parent2Id === p.id || 
                     (conjointObj && (m.parent1Id === conjointObj.id || m.parent2Id === conjointObj.id))
-                ).sort((a, b) => {
-                    function parseDate(str) {
-                        if (!str) return new Date(9999, 0, 1);
-                        const parts = str.split('/');
-                        if (parts.length !== 3) return new Date(9999, 0, 1);
-                        return new Date(parts[2], parts[1] - 1, parts[0]);
+                );
+
+                function parseDate(str) {
+                    if (!str) return new Date(9999, 0, 1);
+                    const parts = str.split('/');
+                    if (parts.length !== 3) return new Date(9999, 0, 1);
+                    return new Date(parts[2], parts[1] - 1, parts[0]);
+                }
+
+                let enfantsP1Seul = [];
+                let enfantsCommuns = [];
+                let enfantsP2Seul = [];
+
+                allEnfants.forEach(e => {
+                    const estLieP1 = (e.parent1Id === p.id || e.parent2Id === p.id);
+                    const estLieP2 = conjointObj && (e.parent1Id === conjointObj.id || e.parent2Id === conjointObj.id);
+
+                    if (estLieP1 && estLieP2) {
+                        enfantsCommuns.push(e);
+                    } else if (estLieP1) {
+                        enfantsP1Seul.push(e);
+                    } else if (estLieP2) {
+                        enfantsP2Seul.push(e);
                     }
-                    return parseDate(a.dateNaissance) - parseDate(b.dateNaissance);
                 });
+
+                // Tri individuel de chaque groupe par date de naissance
+                enfantsP1Seul.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
+                enfantsCommuns.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
+                enfantsP2Seul.sort((a, b) => parseDate(a.dateNaissance) - parseDate(b.dateNaissance));
+
+                // Fusion finale dans l'ordre souhaité pour éviter les croisements
+                const enfantsData = [...enfantsP1Seul, ...enfantsCommuns, ...enfantsP2Seul];
 
                 return {
                     personne: p,
@@ -677,6 +734,31 @@
                     const noeud = construireNoeudHierarchique(m.id);
                     if (noeud) rootData.children.push(noeud);
                 }
+            });
+
+            // --- ASTUCE : Réordonner les racines pour rapprocher les ex-conjoints (ex: Sabine à côté de Pierre) ---
+            rootData.children.sort((a, b) => {
+                // Vérifie si l'un des enfants de 'a' ou 'b' partage un parent dans l'autre branche
+                const aUnEnfantCommunAvec = (noeudRacine, autreNom) => {
+                    let trouve = false;
+                    function check(n) {
+                        if (!n.personne) return;
+                        const p1 = n.personne.parent1Id;
+                        const p2 = n.personne.parent2Id;
+                        if ((p1 && famille.membres.find(x => x.id === p1)?.prenom === autreNom) ||
+                            (p2 && famille.membres.find(x => x.id === p2)?.prenom === autreNom)) {
+                            trouve = true;
+                        }
+                        if (n.children) n.children.forEach(check);
+                    }
+                    if (noeudRacine.children) noeudRacine.children.forEach(check);
+                    return trouve;
+                };
+
+                // Si Sabine (ou un autre ex) est liée à Pierre, on la place juste avant Pierre
+                if (a.personne && a.personne.prenom === "Sabine" && b.personne && b.personne.prenom === "Pierre") return -1;
+                if (b.personne && b.personne.prenom === "Sabine" && a.personne && a.personne.prenom === "Pierre") return 1;
+                return 0;
             });
 
             const width = 1600;
@@ -711,13 +793,14 @@
 
             const g = svgGroup.append("g");
 
-            const treeLayout = d3.tree()
-								.size([width - 100, height - 200])
-								.separation((a, b) => {
-									const hasConjointA = a.data.conjoint !== null;
-									const hasConjointB = b.data.conjoint !== null;
-									return (hasConjointA || hasConjointB) ? 1.8 : 1.2;
-								});
+			const treeLayout = d3.tree()
+				.nodeSize([210, 130]) // [Espacement horizontal réduit à 210px, Hauteur à 130px]
+				.separation((a, b) => {
+					// Si les nœuds adjacents ont des conjoints, on met un coefficient un peu plus doux
+					const hasConjointA = a.data.conjoint !== null;
+					const hasConjointB = b.data.conjoint !== null;
+					return (hasConjointA || hasConjointB) ? 1.4 : 1.1;
+				});
             const root = d3.hierarchy(rootData);
             treeLayout(root);
 
@@ -727,6 +810,7 @@
             
             svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
 
+            // NOUVEAU BLOC : Gestion des liens pour familles recomposées et enfants uniques
             g.selectAll("path")
                 .data(root.links())
                 .enter()
@@ -734,10 +818,122 @@
                 .attr("fill", "none")
                 .attr("stroke", d => d.source.data.personne === null ? "transparent" : "#64748b")
                 .attr("stroke-width", d => d.source.data.personne === null ? "0px" : "2px")
-                .attr("d", d3.linkVertical()
-                    .x(d => d.x)
-                    .y(d => d.y)
-                );
+                .attr("d", d => {
+                    if (d.source.data.personne === null) return "";
+
+                    const enfant = d.target.data.personne;
+                    const p1Id = enfant.parent1Id;
+                    const p2Id = enfant.parent2Id;
+                    
+                    const p1 = d.source.data.personne;
+                    const p2 = d.source.data.conjoint;
+
+                    let xDepart = d.source.x; // Par défaut au centre (le cœur)
+                    const yDepart = d.source.y;
+                    const yCible = d.target.y;
+                    let xCible;
+                    if (d.target.data.conjoint) {
+                        // Si l'enfant est le premier membre du couple (à gauche), on décale vers la gauche
+                        // Si c'est l'autre, on décale vers la droite. 
+                        // En général, l'enfant principal est le premier, donc on soustrait la demi-largeur (ex: 65) :
+                        xCible = d.target.x - 65; 
+                    } else {
+                        xCible = d.target.x;
+                    }
+
+                    // Vérifie quel membre du couple est réellement parent de cet enfant
+                    const estLieP1 = p1 && (p1Id === p1.id || p2Id === p1.id);
+                    const estLieP2 = p2 && (p1Id === p2.id || p2Id === p2.id);
+
+                    if (estLieP1 && !estLieP2) {
+                        // L'enfant est lié au parent de gauche (ex: Pierre) mais PAS au conjoint actuel (ex: Véronique)
+                        xDepart = d.source.x - 65; // Démarre directement de la carte de Pierre
+                    } else if (estLieP2 && !estLieP1) {
+                        // L'enfant est lié au conjoint de droite mais PAS au parent de gauche
+                        xDepart = d.source.x + 65; // Démarre directement de la carte de droite
+                    } else {
+                        // Enfant commun aux deux membres du couple (ou aucun des deux)
+                        xDepart = d.source.x;      // Démarre au milieu du couple (sur le cœur)
+                    }
+
+                    // Tracé de la courbe reliant le bon point de départ aux coordonnées de l'enfant
+                    return `M ${xDepart} ${yDepart} 
+                            C ${xDepart} ${(yDepart + yCible) / 2}, 
+                              ${xCible} ${(yDepart + yCible) / 2}, 
+                              ${xCible} ${yCible}`;
+                });
+				
+				// --- BLOC : Liens secondaires pour les parents ex-conjoints (ex: Sabine pour Mélissa) ---
+				const liensSecondaires = [];
+				
+				famille.membres.forEach(membre => {
+					// On vérifie les deux parents potentiels de chaque membre
+					[membre.parent1Id, membre.parent2Id].forEach(parentId => {
+						if (!parentId) return;
+						
+						// Recherche du nœud D3 de l'enfant et du nœud du parent dans l'arbre
+						const noeudEnfant = root.descendants().find(d => d.data.personne && d.data.personne.id === membre.id);
+						const noeudParent = root.descendants().find(d => {
+							if (d.data.personne && d.data.personne.id === parentId) return true;
+							if (d.data.conjoint && (d.data.personne.id === parentId || d.data.conjoint.id === parentId)) return true;
+							return false;
+						});
+
+						if (noeudEnfant && noeudParent) {
+							// On vérifie si ce lien n'est pas déjà le lien principal de l'arbre
+							const lienPrincipalExiste = root.links().some(l => 
+								l.target === noeudEnfant && l.source === noeudParent
+							);
+
+							if (!lienPrincipalExiste) {
+								liensSecondaires.push({
+									source: noeudParent,
+									target: noeudEnfant,
+									parentId: parentId
+								});
+							}
+						}
+					});
+				});
+
+				// Dessin des traits secondaires en "tronc commun" (ex: Sabine se connecte à la ligne de Pierre)
+				// Dessin des traits secondaires en "tronc commun" connectés à la ligne du parent principal
+				g.selectAll("path.lien-secondaire")
+					.data(liensSecondaires)
+					.enter()
+					.append("path")
+					.attr("class", "lien-secondaire")
+					.attr("fill", "none")
+					.attr("stroke", "#64748b")
+					.attr("stroke-width", "1.5px")
+					.attr("stroke-dasharray", "3,3") // Pointillés pour l'union passée
+					.attr("d", d => {
+						// 1. Point de départ : Sabine (le parent ex-conjoint)
+						let xDepart = d.source.x;
+						if (d.source.data.conjoint) {
+							if (d.source.data.personne.id === d.parentId) {
+								xDepart = d.source.x - 65;
+							} else {
+								xDepart = d.source.x + 65;
+							}
+						}
+						const yDepart = d.source.y;
+
+						// 2. On cherche le lien principal de cet enfant pour trouver la position exacte de la ligne de Pierre
+						const lienPrincipal = root.links().find(l => l.target === d.target);
+						
+						if (!lienPrincipal) return ""; // Sécurité si le lien principal n'est pas trouvé
+
+						// Position de l'axe vertical de Pierre (qui est à gauche dans le couple Pierre/Véronique)
+						const xPierre = lienPrincipal.source.x - 65; 
+						// Hauteur du point de jonction sur la ligne verticale descendante
+						const yJointure = lienPrincipal.source.y + 35; 
+
+						// 3. Tracé orthogonal : part de Sabine, va horizontalement jusqu'à l'axe de Pierre, puis descend
+						return `M ${xDepart} ${yDepart} 
+								H ${xPierre} 
+								V ${yJointure}`;
+					});
 
             const node = g.selectAll(".node")
                 .data(root.descendants().filter(d => d.data.personne !== null && d.data.personne.id))
